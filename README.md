@@ -131,12 +131,6 @@ Copier le code
 
 Contributions are welcome! Feel free to open a pull request or submit an issue if you encounter any problems.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.# FlashCard App
-
-This project is a flashcard application designed to help you learn terms, definitions, and words quickly and efficiently. The application allows you to import flashcards from JSON files, and in future versions, it will synchronize with Notion for a more dynamic and integrated learning experience.
-
 ## Features
 
 -   **Flashcard Creation**: Create flashcards with terms and definitions to facilitate learning.
