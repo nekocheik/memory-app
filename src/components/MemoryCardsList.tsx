@@ -1,20 +1,19 @@
 import { Stack, Card, CardBody, Text } from "@chakra-ui/react";
+import { NavLink } from "react-router-dom";
 
-interface MemoryCardsListProps {
-  memoryCards: Array<{ name: string }>;
-}
+import type { Cards } from "../Types/index";
 
-export const MemoryCardsList: React.FC<MemoryCardsListProps> = ({
-  memoryCards,
-}) => {
+export const MemoryCardsList = ({ memoryCards }: { memoryCards: Cards[] }) => {
   return (
     <Stack mt={4}>
       {memoryCards.map((card, index) => (
-        <Card key={index} onClick={() => console.log(card.name)}>
-          <CardBody>
-            <Text fontWeight={800}>{card.name}</Text>
-          </CardBody>
-        </Card>
+        <NavLink to={`/memory-card/${card.id}`}>
+          <Card key={index} onClick={() => console.log(card.name)}>
+            <CardBody>
+              <Text fontWeight={800}>{card.name}</Text>
+            </CardBody>
+          </Card>
+        </NavLink>
       ))}
     </Stack>
   );

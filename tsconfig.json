@@ -7,7 +7,7 @@
       "esnext"
     ],
     "allowJs": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,  // Désactivé pour forcer une meilleure vérification des types externes
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
@@ -18,9 +18,21 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "noImplicitAny": true,  // Interdiction de l'utilisation implicite de `any`
+    "strictNullChecks": true,  // Vérification stricte des types null/undefined
+    "noImplicitThis": true,  // Vérifie `this` non implicites
+    "typeRoots": [
+      "./node_modules/@types", // Types externes
+      "./src/Types"  // Chemin vers tes fichiers de types
+    ]
   },
   "include": [
-    "src"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts"  // Inclusion des fichiers de définition de types
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }

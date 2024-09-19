@@ -1,0 +1,73 @@
+Info 0    [16:34:17.708] Starting TS Server
+Info 1    [16:34:17.708] Version: 5.6.2
+Info 2    [16:34:17.708] Arguments: /opt/homebrew/Cellar/node/22.8.0/bin/node /Users/cheikkone49/.config/nvim/node_modules/typescript/lib/tsserver.js --logVerbosity verbose --logFile ./tsserver-log.txt
+Info 3    [16:34:17.708] Platform: darwin NodeVersion: v22.8.0 CaseSensitive: false
+Info 4    [16:34:17.708] ServerMode: undefined hasUnknownServerMode: undefined
+Info 5    [16:34:17.711] Binding...
+Info 6    [16:34:17.713] request:
+    Content-Length: 164
+Err 7     [16:34:17.723] Exception on executing command Content-Length: 164:
+
+    Unexpected token 'C', "Content-Length: 164" is not valid JSON
+
+    SyntaxError: Unexpected token 'C', "Content-Length: 164" is not valid JSON
+        at JSON.parse (<anonymous>)
+        at IOSession.parseMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192764:17)
+        at IOSession.onMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192691:22)
+        at Interface.<anonymous> (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/tsserver.js:501:14)
+        at Interface.emit (node:events:520:28)
+        at [_onLine] [as _onLine] (node:internal/readline/interface:416:12)
+        at [_normalWrite] [as _normalWrite] (node:internal/readline/interface:610:22)
+        at Socket.ondata (node:internal/readline/interface:243:23)
+        at Socket.emit (node:events:520:28)
+        at addChunk (node:internal/streams/readable:559:12)
+        at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+        at Readable.push (node:internal/streams/readable:390:5)
+        at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+Info 8    [16:34:17.723] response:
+    {
+      "seq": 0,
+      "type": "response",
+      "command": "unknown",
+      "request_seq": 0,
+      "success": false,
+      "message": "Error processing request. Unexpected token 'C', \"Content-Length: 164\" is not valid JSON\nSyntaxError: Unexpected token 'C', \"Content-Length: 164\" is not valid JSON\n    at JSON.parse (<anonymous>)\n    at IOSession.parseMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192764:17)\n    at IOSession.onMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192691:22)\n    at Interface.<anonymous> (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/tsserver.js:501:14)\n    at Interface.emit (node:events:520:28)\n    at [_onLine] [as _onLine] (node:internal/readline/interface:416:12)\n    at [_normalWrite] [as _normalWrite] (node:internal/readline/interface:610:22)\n    at Socket.ondata (node:internal/readline/interface:243:23)\n    at Socket.emit (node:events:520:28)\n    at addChunk (node:internal/streams/readable:559:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)\n    at Readable.push (node:internal/streams/readable:390:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)"
+    }
+Info 9    [16:34:17.723] request:
+    
+Err 10    [16:34:17.724] Exception on executing command :
+
+    Unexpected end of JSON input
+
+    SyntaxError: Unexpected end of JSON input
+        at JSON.parse (<anonymous>)
+        at IOSession.parseMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192764:17)
+        at IOSession.onMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192691:22)
+        at Interface.<anonymous> (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/tsserver.js:501:14)
+        at Interface.emit (node:events:520:28)
+        at [_onLine] [as _onLine] (node:internal/readline/interface:416:12)
+        at [_normalWrite] [as _normalWrite] (node:internal/readline/interface:610:22)
+        at Socket.ondata (node:internal/readline/interface:243:23)
+        at Socket.emit (node:events:520:28)
+        at addChunk (node:internal/streams/readable:559:12)
+        at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+        at Readable.push (node:internal/streams/readable:390:5)
+        at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
+Info 11   [16:34:17.724] response:
+    {
+      "seq": 0,
+      "type": "response",
+      "command": "unknown",
+      "request_seq": 0,
+      "success": false,
+      "message": "Error processing request. Unexpected end of JSON input\nSyntaxError: Unexpected end of JSON input\n    at JSON.parse (<anonymous>)\n    at IOSession.parseMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192764:17)\n    at IOSession.onMessage (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/typescript.js:192691:22)\n    at Interface.<anonymous> (/Users/cheikkone49/.config/nvim/node_modules/typescript/lib/tsserver.js:501:14)\n    at Interface.emit (node:events:520:28)\n    at [_onLine] [as _onLine] (node:internal/readline/interface:416:12)\n    at [_normalWrite] [as _normalWrite] (node:internal/readline/interface:610:22)\n    at Socket.ondata (node:internal/readline/interface:243:23)\n    at Socket.emit (node:events:520:28)\n    at addChunk (node:internal/streams/readable:559:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)\n    at Readable.push (node:internal/streams/readable:390:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)"
+    }
+Info 12   [16:34:17.724] event:
+    {
+      "seq": 0,
+      "type": "event",
+      "event": "typingsInstallerPid",
+      "body": {
+        "pid": 20968
+      }
+    }
