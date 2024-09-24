@@ -2,7 +2,6 @@ import * as React from "react";
 import { useState, useCallback } from "react";
 
 import {
-  ChakraProvider,
   Stack,
   Divider,
   Tabs,
@@ -10,7 +9,6 @@ import {
   TabList,
   TabPanels,
   TabPanel,
-  SimpleGrid,
   Input,
 } from "@chakra-ui/react";
 
@@ -30,9 +28,9 @@ const HomePage = () => {
   }, []);
 
   return (
-    <ChakraProvider>
+    <>
       <ModalAddNewData openModal={handleOpenModal} />
-      <Stack mx={10}>
+      <Stack>
         <Header openModal={openModal} />
         <Divider mt={2} />
         <Tabs>
@@ -51,7 +49,7 @@ const HomePage = () => {
           </TabPanels>
         </Tabs>
       </Stack>
-    </ChakraProvider>
+    </>
   );
 };
 

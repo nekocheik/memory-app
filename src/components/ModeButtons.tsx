@@ -1,15 +1,37 @@
 import { SimpleGrid, Button } from "@chakra-ui/react";
 
-export const ModeButtons = () => {
+import type { GameMode } from "../Types/index";
+
+export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
+  function selectMode(mode: GameMode) {
+    const newPath = `/card/${cardId}/${mode}`;
+    window.location.href = newPath;
+  }
+
   return (
     <SimpleGrid spacing={4}>
-      <Button fontSize={23} height={24} w="100%">
+      <Button
+        onClick={() => selectMode("Quiz")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
         QUIZ
       </Button>
-      <Button fontSize={23} height={24} w="100%">
+      <Button
+        onClick={() => selectMode("Repetition")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
         REPETITION
       </Button>
-      <Button fontSize={23} height={24} w="100%">
+      <Button
+        onClick={() => selectMode("FollowUp")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
         SUIVI
       </Button>
     </SimpleGrid>
