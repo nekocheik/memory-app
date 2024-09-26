@@ -23,13 +23,9 @@ const HomePage = () => {
   const [openModal, setOpenModal] = useState<(() => void) | null>(null);
   const [memoryCards] = useState(data);
 
-  const handleOpenModal = useCallback((fn: () => void): void => {
-    setOpenModal(fn);
-  }, []);
-
   return (
     <>
-      <ModalAddNewData openModal={handleOpenModal} />
+      <ModalAddNewData openModal={(fn) => setOpenModal} />
       <Stack>
         <Header openModal={openModal} />
         <Divider mt={2} />

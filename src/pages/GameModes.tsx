@@ -1,16 +1,10 @@
 import { Text, Flex, Stack } from "@chakra-ui/react";
 import { useParams } from "react-router-dom";
-import type {
-  GameMode,
-  StructureType,
-  MemoryCardType,
-  Answer,
-} from "../Types/index";
+import type { GameMode, StructureType, MemoryCardType } from "../Types/index";
 
 import { Header } from "../components/Header";
 
 import { Quiz } from "../components/Quiz";
-import { useCallback, useState } from "react";
 import { useQuery } from "../hooks/useQuery";
 
 import { data } from "../data";
@@ -41,7 +35,6 @@ const useViewMode = (gameMode: GameMode, id: string) => {
 };
 
 const getMemoryCard = ({ cards, Q }: { cards: StructureType; Q: string }) => {
-  console.log(cards);
   if (Q) {
     return cards.cards[Q as any];
   } else {
@@ -49,14 +42,7 @@ const getMemoryCard = ({ cards, Q }: { cards: StructureType; Q: string }) => {
   }
 };
 
-const getQuestion = (
-  card: MemoryCardType
-): {
-  question: string;
-  answer: string;
-  isResolve: boolean;
-  answers: Answer[];
-} => {
+const getQuestion = (card: MemoryCardType): MemoryCardType => {
   return card;
 };
 

@@ -11,7 +11,7 @@ export const MemoryCardsList = ({
   return (
     <Stack mt={4}>
       {memoryCards.map((card, index) => (
-        <NavLink to={`/memory-card/${card.id}`}>
+        <NavLink key={card.id + "_" + index} to={`/memory-card/${card.id}`}>
           <Card key={index} onClick={() => console.log(card.name)}>
             <CardBody>
               <Text fontWeight={800}>{card.name}</Text>

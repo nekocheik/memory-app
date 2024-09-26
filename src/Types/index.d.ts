@@ -11,7 +11,7 @@ export interface StructureType {
   cards: MemoryCardType[];
 }
 
-export type StructuresTypes = StructureType[]
+export type StructuresTypes = StructureType[];
 
 export interface MemoryCardType {
   question: string;

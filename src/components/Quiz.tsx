@@ -1,16 +1,21 @@
 import React from "react";
 import { MCard } from "../components/GameMode/Card";
 import { Stack, Text } from "@chakra-ui/react";
+import { MemoryCardType } from "../Types";
 
-export const Quiz = ({ currentQuestion }: any) => {
+export const Quiz = ({
+  currentQuestion,
+}: {
+  currentQuestion: MemoryCardType;
+}) => {
   return (
     <Stack>
       <MCard text={currentQuestion.question} />
       <Stack>
         <Text>Réponse </Text>
-        <MCard text={currentQuestion.answers[0].text} />
-        <MCard text={currentQuestion.answers[1].text} />
-        <MCard text={currentQuestion.answers[2].text} />
+        {currentQuestion.answers.map((answer) => {
+          return <MCard onClick={() => {}} answer={answer} />;
+        })}
       </Stack>
     </Stack>
   );
