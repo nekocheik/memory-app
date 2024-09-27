@@ -5,13 +5,13 @@ export interface Answer {
   proximity: number;
 }
 
-export interface StructureType {
+export interface KnowledgeSet {
   name: string;
-  id: string;
+  _id: string;
   cards: MemoryCardType[];
 }
 
-export type StructuresTypes = StructureType[];
+export type KnowledgeSets = KnowledgeSet[];
 
 export interface MemoryCardType {
   question: string;

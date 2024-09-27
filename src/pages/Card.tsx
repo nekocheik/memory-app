@@ -6,12 +6,12 @@ import { Header } from "../components/Header";
 import { useParams } from "react-router-dom";
 
 import { data } from "../data";
-import type { StructureType } from "../Types/index";
+import type { KnowledgeSet } from "../Types/index";
 import { ModeButtons } from "../components/ModeButtons";
 
 export const Card = () => {
   let { id } = useParams();
-  const card = (data as StructureType[]).find((card) => card.id == id);
+  const card = (data as KnowledgeSet[]).find((card) => card._id == id);
 
   return (
     <>
@@ -25,7 +25,7 @@ export const Card = () => {
           <Text pt={4} fontWeight={800} fontSize="2xl" textAlign={"center"}>
             {card?.name}
           </Text>
-          <ModeButtons cardId={card?.id || null} />
+          <ModeButtons cardId={card?._id || null} />
         </Stack>
       </Stack>
     </>

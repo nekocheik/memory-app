@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import {
   Stack,
@@ -13,19 +13,30 @@ import {
 } from "@chakra-ui/react";
 
 import { Header } from "../components/Header";
-import { ModalAddNewData } from "../components/modals/addData";
+import { ModalAddKnowledgeSet } from "../components/modals/addData";
 import { MemoryCardsList } from "../components/MemoryCardsList";
 import { ModeButtons } from "../components/ModeButtons";
 
-import { data } from "../data";
+import type { KnowledgeSets } from "../Types";
+import { useApi } from "../hooks/useApi";
 
 const HomePage = () => {
   const [openModal, setOpenModal] = useState<(() => void) | null>(null);
-  const [memoryCards] = useState(data);
+  const [memoryCards, setMemoryCards] = useState<KnowledgeSets>([]);
+  const { getUserKnowledgeSets } = useApi();
+
+  useEffect(() => {
+    async function fetchData() {
+      const knowledgeSets = await getUserKnowledgeSets(); // Appel à l'API
+      setMemoryCards(knowledgeSets.data); // Mise à jour de l'état avec les données récupérées
+    }
+
+    fetchData();
+  }, []);
 
   return (
     <>
-      <ModalAddNewData openModal={(fn) => setOpenModal} />
+      <ModalAddKnowledgeSet openModal={(fn) => setOpenModal(fn)} />
       <Stack>
         <Header openModal={openModal} />
         <Divider mt={2} />

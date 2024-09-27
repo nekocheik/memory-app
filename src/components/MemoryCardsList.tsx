@@ -1,18 +1,19 @@
-import { Card, CardBody, Stack, Text } from "@chakra-ui/react";
+import { Stack, Card, CardBody, Text } from "@chakra-ui/react";
 import { NavLink } from "react-router-dom";
 
-import type { StructureType } from "../Types/index";
+import type { KnowledgeSets } from "../Types";
 
 export const MemoryCardsList = ({
   memoryCards,
 }: {
-  memoryCards: StructureType[];
+  memoryCards: KnowledgeSets;
 }) => {
+  console.log(memoryCards);
   return (
     <Stack mt={4}>
-      {memoryCards.map((card, index) => (
-        <NavLink key={card.id + "_" + index} to={`/memory-card/${card.id}`}>
-          <Card key={index} onClick={() => console.log(card.name)}>
+      {memoryCards.map((card) => (
+        <NavLink key={card._id} to={`/memory-card/${card._id}`}>
+          <Card onClick={() => console.log(card.name)}>
             <CardBody>
               <Text fontWeight={800}>{card.name}</Text>
             </CardBody>

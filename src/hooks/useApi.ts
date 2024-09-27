@@ -1,4 +1,5 @@
 import axios from "axios";
+import useUserStore from "../store";
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_BACKEND_URI,
@@ -30,9 +31,31 @@ api.interceptors.response.use(
   }
 );
 
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Erreur dans la requête:", error);
+    return Promise.reject(error);
+  }
+);
+
 const PATH = {
   signup: "/api/user/signup",
   login: "/api/user/login",
+  knowledgeAdd: "/api/knowledge-set/add",
+  knowledgeSets: "/api/knowledge-set",
+};
+
+const setToken = (token: string) => {
+  const userStore = useUserStore.getState(); // Utiliser le store directement
+  userStore.setToken(token);
+  localStorage.setItem("access_token", token);
 };
 
 const signup = async ({
@@ -45,11 +68,12 @@ const signup = async ({
   password: string;
 }) => {
   try {
-    return await api.post(PATH.signup, {
-      username,
-      email,
-      password,
-    });
+    const response = await api.post(PATH.signup, { username, email, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
   } catch (error) {
     console.error("Failed to signup:", error);
     throw new Error("Failed to signup");
@@ -64,19 +88,56 @@ const login = async ({
   password: string;
 }) => {
   try {
-    return await api.post(PATH.login, {
-      username,
-      password,
-    });
+    const response = await api.post(PATH.login, { username, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
   } catch (error) {
     console.error("Failed to login:", error);
     throw new Error("Failed to login");
   }
 };
 
+const addKnowledgeSet = async (KnowledgeSet: any) => {
+  try {
+    const response = await api.post(PATH.knowledgeAdd, {
+      ...KnowledgeSet,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to add knowledge set:", error);
+    throw error;
+  }
+};
+
+const getUserKnowledgeSets = async () => {
+  try {
+    const response = await api.get(PATH.knowledgeSets);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge sets:", error);
+    throw error;
+  }
+};
+
+const getKnowledgeSetById = async (id: string) => {
+  try {
+    const response = await api.get(`/api/knowledge-set/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
 export const useApi = () => {
   return {
+    getKnowledgeSetById,
+    addKnowledgeSet,
     signup,
     login,
+    getUserKnowledgeSets,
   };
 };

@@ -22,13 +22,17 @@ export const LoginPage = () => {
   };
 
   const handleLogin = async () => {
-    // Simule l'authentification
-    const result = await login(form);
+    try {
+      const response = await login(form);
 
-    if (result) {
-      navigate("/");
-    } else {
-      alert("Identifiants incorrects");
+      if (response) {
+        navigate("/");
+      } else {
+        alert("Identifiants incorrects");
+      }
+    } catch (error) {
+      console.error("Erreur de connexion:", error);
+      alert("Erreur lors de la connexion");
     }
   };
 

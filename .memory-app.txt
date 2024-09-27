@@ -1,0 +1,1332 @@
+/// memory-app/src/App.test.tsx
+
+import React from "react"
+import { screen } from "@testing-library/react"
+import { render } from "./test-utils"
+import { App } from "./App"
+
+test("renders learn react link", () => {
+  render(<App />)
+  const linkElement = screen.getByText(/learn chakra/i)
+  // expect(linkElement).toBeInTheDocument()
+})
+
+
+---------
+/// memory-app/src/App.tsx
+
+import * as React from "react";
+
+import { ChakraProvider, Stack } from "@chakra-ui/react";
+
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
+///memory-card/:id
+
+import { HomePage } from "./pages/HomePage";
+import { Card } from "./pages/Card";
+import { GameModes } from "./pages/GameModes";
+import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+export const App = () => {
+  return (
+    <ChakraProvider>
+      <Stack mx={3}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/memory-card/:id"
+            element={
+              <ProtectedRoute>
+                <Card />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/card/:id/:gameMode" element={<GameModes />} />
+          <Route path="*" element={<div>404 - Page not found</div>} />
+        </Routes>
+      </Stack>
+    </ChakraProvider>
+  );
+};
+
+
+---------
+/// memory-app/src/ColorModeSwitcher.tsx
+
+import * as React from "react"
+import {
+  useColorMode,
+  useColorModeValue,
+  IconButton,
+  IconButtonProps,
+} from "@chakra-ui/react"
+import { FaMoon, FaSun } from "react-icons/fa"
+
+type ColorModeSwitcherProps = Omit<IconButtonProps, "aria-label">
+
+export const ColorModeSwitcher: React.FC<ColorModeSwitcherProps> = (props) => {
+  const { toggleColorMode } = useColorMode()
+  const text = useColorModeValue("dark", "light")
+  const SwitchIcon = useColorModeValue(FaMoon, FaSun)
+
+  return (
+    <IconButton
+      size="md"
+      fontSize="lg"
+      variant="ghost"
+      color="current"
+      marginLeft="2"
+      onClick={toggleColorMode}
+      icon={<SwitchIcon />}
+      aria-label={`Switch to ${text} mode`}
+      {...props}
+    />
+  )
+}
+
+
+---------
+/// memory-app/src/Logo.tsx
+
+import * as React from "react"
+import {
+  chakra,
+  keyframes,
+  ImageProps,
+  forwardRef,
+  usePrefersReducedMotion,
+} from "@chakra-ui/react"
+import logo from "./logo.svg"
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`
+
+export const Logo = forwardRef<ImageProps, "img">((props, ref) => {
+  const prefersReducedMotion = usePrefersReducedMotion()
+
+  const animation = prefersReducedMotion
+    ? undefined
+    : `${spin} infinite 20s linear`
+
+  return <chakra.img animation={animation} src={logo} ref={ref} {...props} />
+})
+
+
+---------
+/// memory-app/src/Types/index.d.ts
+
+export interface Answer {
+  text: string;
+  isCorrect: boolean;
+  count: number;
+  proximity: number;
+}
+
+export interface KnowledgeSet {
+  name: string;
+  id: string;
+  cards: MemoryCardType[];
+}
+
+export type KnowledgeSets = KnowledgeSet[];
+
+export interface MemoryCardType {
+  question: string;
+  answers: Answer[];
+  answer: string;
+  isResolve: boolean;
+}
+
+export type ID = string;
+
+export type GameMode = "Quiz" | "Repetition" | "FollowUp";
+
+
+---------
+/// memory-app/src/components/GameMode/Card.tsx
+
+import { CardBody, Card, Text } from "@chakra-ui/react";
+import React from "react";
+import { Answer } from "../../Types";
+
+export const MCard = ({
+  onClick,
+  answer,
+  text = "",
+}: {
+  onClick?: () => void;
+  text?: string;
+  answer?: Answer;
+}) => {
+  return (
+    <Card cursor={onClick ? "pointer" : ""} onClick={onClick}>
+      <CardBody>
+        <Text>{text || answer?.text}</Text>
+      </CardBody>
+    </Card>
+  );
+};
+
+export default MCard;
+
+
+---------
+/// memory-app/src/components/Header.tsx
+
+import * as React from "react";
+
+//import { PlusSquareIcon } from "@chakra-ui/icons";
+
+import { Flex, Text, Spacer, Button } from "@chakra-ui/react";
+
+export const Header = ({
+  openModal,
+  hiddenButton,
+}: {
+  hiddenButton?: boolean;
+  openModal?: any;
+}) => (
+  <Flex mt={10}>
+    <Text fontWeight={800} fontSize="2xl">
+      |MEMORY-CARD|
+    </Text>
+    <Spacer />
+    {!hiddenButton ? <Button onClick={openModal}>Ajouter</Button> : ""}
+  </Flex>
+);
+
+
+---------
+/// memory-app/src/components/MemoryCardsList.tsx
+
+import { useApi } from "../hooks/useApi";
+import { Stack, Card, CardBody, Text } from "@chakra-ui/react";
+import { NavLink } from "react-router-dom";
+
+import type { KnowledgeSets } from "../Types";
+
+export const MemoryCardsList = ({
+  memoryCards,
+}: {
+  memoryCards: KnowledgeSets;
+}) => {
+  return (
+    <Stack mt={4}>
+      {memoryCards.map((card) => (
+        <NavLink key={card._id} to={`/memory-card/${card._id}`}>
+          <Card onClick={() => console.log(card.name)}>
+            <CardBody>
+              <Text fontWeight={800}>{card.name}</Text>
+            </CardBody>
+          </Card>
+        </NavLink>
+      ))}
+    </Stack>
+  );
+};
+
+
+---------
+/// memory-app/src/components/ModeButtons.tsx
+
+import { SimpleGrid, Button } from "@chakra-ui/react";
+
+import type { GameMode } from "../Types/index";
+
+export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
+  function selectMode(mode: GameMode) {
+    const newPath = `/card/${cardId}/${mode}`;
+    window.location.href = newPath;
+  }
+
+  return (
+    <SimpleGrid spacing={4}>
+      <Button
+        onClick={() => selectMode("Quiz")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
+        QUIZ
+      </Button>
+      <Button
+        onClick={() => selectMode("Repetition")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
+        REPETITION
+      </Button>
+      <Button
+        onClick={() => selectMode("FollowUp")}
+        fontSize={23}
+        height={24}
+        w="100%"
+      >
+        SUIVI
+      </Button>
+    </SimpleGrid>
+  );
+};
+
+
+---------
+/// memory-app/src/components/ProtectedRoute.tsx
+
+import React from "react";
+import { Navigate } from "react-router-dom";
+
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const token = localStorage.getItem("access_token");
+
+  console.log(token);
+
+  if (!token) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+};
+
+export default ProtectedRoute;
+
+
+---------
+/// memory-app/src/components/Quiz.tsx
+
+import React from "react";
+import { MCard } from "../components/GameMode/Card";
+import { Stack, Text } from "@chakra-ui/react";
+import { MemoryCardType } from "../Types";
+
+export const Quiz = ({
+  currentQuestion,
+}: {
+  currentQuestion: MemoryCardType;
+}) => {
+  return (
+    <Stack>
+      <MCard text={currentQuestion.question} />
+      <Stack>
+        <Text>Réponse </Text>
+        {currentQuestion.answers.map((answer) => {
+          return <MCard onClick={() => {}} answer={answer} />;
+        })}
+      </Stack>
+    </Stack>
+  );
+};
+
+export default Quiz;
+
+
+---------
+/// memory-app/src/components/Types.d.tsx
+
+export {};
+//export interface Cards2 {
+//  name: string;
+//  id: string;
+//  cards: MemoryCard[];
+//}
+//
+//export interface MemoryCard2 {
+//  question: string;
+//  answer: string;
+//  isResolve: boolean;
+//}
+
+
+---------
+/// memory-app/src/components/modals/addData.tsx
+
+import React, { useState, useEffect } from "react";
+import {
+  FormControl,
+  FormLabel,
+  Textarea,
+  Input,
+  Button,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@chakra-ui/react";
+import { useApi } from "../../hooks/useApi";
+
+export function ModalAddKnowledgeSet({
+  openModal,
+}: {
+  openModal: (fn: () => void) => void;
+}) {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { addKnowledgeSet } = useApi();
+  const [KnowledgeSet, setKnowledgeSet] = useState({
+    name: "",
+    cards: [],
+  });
+  const [cardsInput, setCardsInput] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleSubmit = async () => {
+    try {
+      const parsedCards = JSON.parse(cardsInput);
+      setKnowledgeSet({ ...KnowledgeSet, cards: parsedCards });
+      await addKnowledgeSet({ ...KnowledgeSet, cards: parsedCards });
+      setErrorMessage("");
+      onClose();
+    } catch (error) {
+      setErrorMessage("Invalid JSON format. Please correct it.");
+    }
+  };
+
+  useEffect(() => {
+    openModal(() => onOpen);
+  }, []);
+
+  return (
+    <>
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Add New Knowledge Set</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <FormControl>
+              <FormLabel>Name</FormLabel>
+              <Input
+                placeholder="Set Name"
+                value={KnowledgeSet.name}
+                onChange={(e) =>
+                  setKnowledgeSet({ ...KnowledgeSet, name: e.target.value })
+                }
+              />
+            </FormControl>
+
+            <FormControl mt={4}>
+              <FormLabel>Cards (in JSON format)</FormLabel>
+              <Textarea
+                placeholder='Add cards as a JSON array (e.g., [{"question": "What is 2+2?", "answer": "4"}])'
+                value={cardsInput}
+                onChange={(e) => setCardsInput(e.target.value)} // Just update the string state
+              />
+            </FormControl>
+
+            {errorMessage && (
+              <p style={{ color: "red" }}>{errorMessage}</p> // Display the error message
+            )}
+          </ModalBody>
+
+          <ModalFooter>
+            <Button colorScheme="blue" onClick={handleSubmit} mr={3}>
+              Save
+            </Button>
+            <Button onClick={onClose}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
+  );
+}
+
+
+---------
+/// memory-app/src/data.ts
+
+import type { KnowledgeSets } from "./Types/index";
+
+const data: KnowledgeSets = [
+  {
+    name: "Chemical Elements and Symbols",
+    id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
+    cards: [
+      {
+        question: "What is 2 + 2?",
+        answer: "4",
+        isResolve: true,
+        answers: [
+          { text: "4", isCorrect: true, count: 0, proximity: 1 },
+          { text: "2", isCorrect: false, count: 0, proximity: 0.5 },
+          { text: "6", isCorrect: false, count: 0, proximity: 0.2 },
+          { text: "8", isCorrect: false, count: 0, proximity: 0.1 },
+          { text: "10", isCorrect: false, count: 0, proximity: 0.05 },
+          { text: "12", isCorrect: false, count: 0, proximity: 0.01 },
+          { text: "14", isCorrect: false, count: 0, proximity: 0.005 },
+          { text: "16", isCorrect: false, count: 0, proximity: 0.001 },
+          { text: "18", isCorrect: false, count: 0, proximity: 0.0005 },
+          { text: "20", isCorrect: false, count: 0, proximity: 0.0001 },
+        ],
+      },
+      {
+        question: "What is the chemical symbol for water?",
+        answer: "H2O",
+        isResolve: false,
+        answers: [
+          { text: "H2O", isCorrect: true, count: 0, proximity: 1 },
+          { text: "H2S", isCorrect: false, count: 0, proximity: 0.5 },
+          { text: "CO2", isCorrect: false, count: 0, proximity: 0.2 },
+          { text: "O2", isCorrect: false, count: 0, proximity: 0.1 },
+          { text: "N2", isCorrect: false, count: 0, proximity: 0.05 },
+          { text: "He", isCorrect: false, count: 0, proximity: 0.01 },
+          { text: "Ne", isCorrect: false, count: 0, proximity: 0.005 },
+          { text: "Ar", isCorrect: false, count: 0, proximity: 0.001 },
+          { text: "Kr", isCorrect: false, count: 0, proximity: 0.0005 },
+          { text: "Xe", isCorrect: false, count: 0, proximity: 0.0001 },
+        ],
+      },
+      {
+        question: "Who wrote '1984'?",
+        answer: "George Orwell",
+        isResolve: true,
+        answers: [
+          { text: "George Orwell", isCorrect: true, count: 0, proximity: 1 },
+          { text: "Aldous Huxley", isCorrect: false, count: 0, proximity: 0.5 },
+          { text: "Ray Bradbury", isCorrect: false, count: 0, proximity: 0.2 },
+          {
+            text: "Fahrenheit 451",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.1,
+          },
+          {
+            text: "Joseph Heller",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.05,
+          },
+          {
+            text: "Kurt Vonnegut",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.01,
+          },
+          {
+            text: "Isaac Asimov",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.005,
+          },
+          {
+            text: "Arthur C. Clarke",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.001,
+          },
+          {
+            text: "Robert A. Heinlein",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.0005,
+          },
+          {
+            text: "Philip K. Dick",
+            isCorrect: false,
+            count: 0,
+            proximity: 0.0001,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export { data };
+
+
+---------
+/// memory-app/src/hooks/useApi.ts
+
+import axios from "axios";
+import useUserStore from "../store";
+
+const api = axios.create({
+  baseURL: process.env.REACT_APP_BACKEND_URI,
+  timeout: 1000,
+  headers: { "X-Custom-Header": "foobar" },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    console.log("Request made to:", config.url);
+    console.log("Request data:", config.data);
+    return config;
+  },
+  (error) => {
+    console.error("Error in request:", error);
+    return Promise.reject(error);
+  }
+);
+
+api.interceptors.response.use(
+  (response) => {
+    console.log("Response received from:", response.config.url);
+    console.log("Response data:", response.data);
+    return response;
+  },
+  (error) => {
+    console.error("Error in response:", error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Erreur dans la requête:", error);
+    return Promise.reject(error);
+  }
+);
+
+const PATH = {
+  signup: "/api/user/signup",
+  login: "/api/user/login",
+  knowledgeAdd: "/api/knowledge-set/add",
+  knowledgeSets: "/api/knowledge-set",
+};
+
+const setToken = (token: string) => {
+  const userStore = useUserStore.getState(); // Utiliser le store directement
+  userStore.setToken(token);
+  localStorage.setItem("access_token", token);
+};
+
+const signup = async ({
+  username,
+  email,
+  password,
+}: {
+  username: string;
+  email: string;
+  password: string;
+}) => {
+  try {
+    const response = await api.post(PATH.signup, { username, email, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
+  } catch (error) {
+    console.error("Failed to signup:", error);
+    throw new Error("Failed to signup");
+  }
+};
+
+const login = async ({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+}) => {
+  try {
+    const response = await api.post(PATH.login, { username, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
+  } catch (error) {
+    console.error("Failed to login:", error);
+    throw new Error("Failed to login");
+  }
+};
+
+const addKnowledgeSet = async (KnowledgeSet: any) => {
+  try {
+    const response = await api.post(PATH.knowledgeAdd, {
+      ...KnowledgeSet,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to add knowledge set:", error);
+    throw error;
+  }
+};
+
+const getUserKnowledgeSets = async () => {
+  try {
+    const response = await api.get(PATH.knowledgeSets);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge sets:", error);
+    throw error;
+  }
+};
+
+export const useApi = () => {
+  return {
+    addKnowledgeSet,
+    signup,
+    login,
+    getUserKnowledgeSets,
+  };
+};
+
+
+---------
+/// memory-app/src/hooks/useQuery.ts
+
+import { useLocation } from "react-router-dom";
+
+export const useQuery = (): { Q: string } => {
+  return new URLSearchParams(useLocation().search) as any;
+};
+
+
+---------
+/// memory-app/src/index.tsx
+
+import * as React from "react";
+import * as ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom"; // Import BrowserRouter
+import { App } from "./App";
+import reportWebVitals from "./reportWebVitals";
+import * as serviceWorker from "./serviceWorker";
+
+const container = document.getElementById("root");
+if (!container) throw new Error("Failed to find the root element");
+const root = ReactDOM.createRoot(container);
+
+root.render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+);
+
+// If you want your app to work offline and load faster, you can change
+// unregister() to register() below. Note this comes with some pitfalls.
+// Learn more about service workers: https://cra.link/PWA
+serviceWorker.unregister();
+
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
+
+
+---------
+/// memory-app/src/pages/Card.tsx
+
+import { Button, Flex, Stack, Text } from "@chakra-ui/react";
+
+import * as React from "react";
+
+import { Header } from "../components/Header";
+import { useParams } from "react-router-dom";
+
+import { data } from "../data";
+import type { KnowledgeSet } from "../Types/index";
+import { ModeButtons } from "../components/ModeButtons";
+
+export const Card = () => {
+  let { id } = useParams();
+  const card = (data as KnowledgeSet[]).find((card) => card._id == id);
+
+  return (
+    <>
+      <Header openModal />
+      <Stack>
+        <Button width={40} height={14}>
+          Retour
+        </Button>
+
+        <Stack>
+          <Text pt={4} fontWeight={800} fontSize="2xl" textAlign={"center"}>
+            {card?.name}
+          </Text>
+          <ModeButtons cardId={card?._id || null} />
+        </Stack>
+      </Stack>
+    </>
+  );
+};
+
+
+---------
+/// memory-app/src/pages/GameModes.tsx
+
+import { Text, Flex, Stack } from "@chakra-ui/react";
+import { useParams } from "react-router-dom";
+import type {
+  GameMode,
+  KnowledgeSet,
+  MemoryCardType,
+  Answer,
+} from "../Types/index";
+
+import { Header } from "../components/Header";
+
+import { Quiz } from "../components/Quiz";
+import { useCallback, useState } from "react";
+import { useQuery } from "../hooks/useQuery";
+
+import { data } from "../data";
+let data2 = data as KnowledgeSet[];
+
+function getStructure({ id }: { id: string }): KnowledgeSet {
+  console.log(id);
+  return data2.find(({ id: idC }) => idC === id) as KnowledgeSet;
+}
+
+const useViewMode = (gameMode: GameMode, id: string) => {
+  const { Q }: { Q: string } = useQuery();
+
+  const question = getQuestion(
+    getMemoryCard({
+      cards: getStructure({ id }),
+      Q: Q,
+    })
+  );
+
+  if (gameMode === "Quiz") {
+    return <Quiz currentQuestion={question} />;
+  } else if (gameMode === "Repetition") {
+    return <div>Mode 2 view</div>;
+  } else {
+    return <div>Unknown game mode</div>;
+  }
+};
+
+const getMemoryCard = ({ cards, Q }: { cards: KnowledgeSet; Q: string }) => {
+  console.log(cards);
+  if (Q) {
+    return cards.cards[Q as any];
+  } else {
+    return cards.cards[0];
+  }
+};
+
+const getQuestion = (
+  card: MemoryCardType
+): {
+  question: string;
+  answer: string;
+  isResolve: boolean;
+  answers: Answer[];
+} => {
+  return card;
+};
+
+export const GameModes = () => {
+  const { gameMode = "Quiz", id = "0" } = useParams<{
+    gameMode: GameMode;
+    id: string;
+  }>();
+
+  return (
+    <Stack>
+      <Header hiddenButton={true} />
+      <Flex py={10} justify={"space-between"}>
+        <Text pr={20}>{gameMode}</Text>
+        <Text>10s</Text>
+      </Flex>
+
+      {useViewMode(gameMode, id)}
+    </Stack>
+  );
+};
+
+
+---------
+/// memory-app/src/pages/HomePage.tsx
+
+import * as React from "react";
+import { useEffect, useState, useCallback } from "react";
+
+import {
+  Stack,
+  Divider,
+  Tabs,
+  Tab,
+  TabList,
+  TabPanels,
+  TabPanel,
+  Input,
+} from "@chakra-ui/react";
+
+import { Header } from "../components/Header";
+import { ModalAddKnowledgeSet } from "../components/modals/addData";
+import { MemoryCardsList } from "../components/MemoryCardsList";
+import { ModeButtons } from "../components/ModeButtons";
+
+import type { KnowledgeSets } from "../Types";
+import { useApi } from "../hooks/useApi";
+
+const HomePage = () => {
+  const [openModal, setOpenModal] = useState<(() => void) | null>(null);
+  const [memoryCards, setMemoryCards] = useState<KnowledgeSets>([]);
+  const { getUserKnowledgeSets } = useApi();
+
+  useEffect(() => {
+    async function fetchData() {
+      const knowledgeSets = await getUserKnowledgeSets(); // Appel à l'API
+      setMemoryCards(knowledgeSets.data); // Mise à jour de l'état avec les données récupérées
+    }
+
+    fetchData();
+  }, []);
+
+  return (
+    <>
+      <ModalAddKnowledgeSet openModal={(fn) => setOpenModal(fn)} />
+      <Stack>
+        <Header openModal={openModal} />
+        <Divider mt={2} />
+        <Tabs>
+          <TabList>
+            <Tab>Mode</Tab>
+            <Tab>Mes Carts</Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel>
+              <ModeButtons />
+            </TabPanel>
+            <TabPanel>
+              <Input borderRadius={40} placeholder="Filtre" />
+              <MemoryCardsList memoryCards={memoryCards} />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </Stack>
+    </>
+  );
+};
+
+export { HomePage };
+
+
+---------
+/// memory-app/src/pages/LoginPage.tsx
+
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Box,
+  Button,
+  Input,
+  FormControl,
+  FormLabel,
+  Heading,
+  VStack,
+} from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+
+export const LoginPage = () => {
+  const [form, setForm] = useState({ username: "", password: "" });
+  const navigate = useNavigate();
+  const { login } = useApi();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleLogin = async () => {
+    try {
+      const response = await login(form);
+
+      if (response) {
+        navigate("/");
+      } else {
+        alert("Identifiants incorrects");
+      }
+    } catch (error) {
+      console.error("Erreur de connexion:", error);
+      alert("Erreur lors de la connexion");
+    }
+  };
+
+  return (
+    <Box maxW="md" mx="auto" mt="10" p="6" borderWidth="1px" borderRadius="lg">
+      <VStack spacing="6">
+        <Heading>Connexion</Heading>
+        <FormControl id="username">
+          <FormLabel>Nom d'utilisateur</FormLabel>
+          <Input
+            type="text"
+            name="username"
+            value={form.username}
+            onChange={handleInputChange}
+            placeholder="Nom d'utilisateur"
+          />
+        </FormControl>
+        <FormControl id="password">
+          <FormLabel>Mot de passe</FormLabel>
+          <Input
+            type="password"
+            name="password"
+            value={form.password}
+            onChange={handleInputChange}
+            placeholder="Mot de passe"
+          />
+        </FormControl>
+        <Button colorScheme="teal" width="full" onClick={handleLogin}>
+          Connexion
+        </Button>
+        <Button width="full" onClick={() => navigate("/signup")}>
+          Inscription
+        </Button>
+      </VStack>
+    </Box>
+  );
+};
+
+export default LoginPage;
+
+
+---------
+/// memory-app/src/pages/SignupPage.tsx
+
+import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Input,
+  FormControl,
+  FormLabel,
+  Heading,
+  VStack,
+} from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+
+export const SignupPage = () => {
+  const [form, setForm] = useState({ username: "", email: "", password: "" });
+  const { signup } = useApi();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleSignup = async () => {
+    const connexion = await signup(form);
+    console.log("Inscription réussie avec", form, connexion);
+    // Appelle ici une API pour inscrire l'utilisateur
+  };
+
+  return (
+    <Box maxW="md" mx="auto" mt="10" p="6" borderWidth="1px" borderRadius="lg">
+      <VStack spacing="6">
+        <Heading>Inscription</Heading>
+        <FormControl id="username">
+          <FormLabel>Nom d'utilisateur</FormLabel>
+          <Input
+            type="text"
+            name="username"
+            value={form.username}
+            onChange={handleInputChange}
+            placeholder="Nom d'utilisateur"
+          />
+        </FormControl>
+        <FormControl id="email">
+          <FormLabel>Email</FormLabel>
+          <Input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleInputChange}
+            placeholder="Email"
+          />
+        </FormControl>
+        <FormControl id="password">
+          <FormLabel>Mot de passe</FormLabel>
+          <Input
+            type="password"
+            name="password"
+            value={form.password}
+            onChange={handleInputChange}
+            placeholder="Mot de passe"
+          />
+        </FormControl>
+        <Button colorScheme="teal" width="full" onClick={handleSignup}>
+          Inscription
+        </Button>
+      </VStack>
+    </Box>
+  );
+};
+
+export default SignupPage;
+
+
+---------
+/// memory-app/src/react-app-env.d.ts
+
+/// <reference types="react-scripts" />
+
+
+---------
+/// memory-app/src/reportWebVitals.ts
+
+import { ReportHandler } from "web-vitals"
+
+const reportWebVitals = (onPerfEntry?: ReportHandler) => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    import("web-vitals").then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      getCLS(onPerfEntry)
+      getFID(onPerfEntry)
+      getFCP(onPerfEntry)
+      getLCP(onPerfEntry)
+      getTTFB(onPerfEntry)
+    })
+  }
+}
+
+export default reportWebVitals
+
+
+---------
+/// memory-app/src/serviceWorker.ts
+
+// This optional code is used to register a service worker.
+// register() is not called by default.
+
+// This lets the app load faster on subsequent visits in production, and gives
+// it offline capabilities. However, it also means that developers (and users)
+// will only see deployed updates on subsequent visits to a page, after all the
+// existing tabs open on the page have been closed, since previously cached
+// resources are updated in the background.
+
+// To learn more about the benefits of this model and instructions on how to
+// opt-in, read https://cra.link/PWA
+
+const isLocalhost = Boolean(
+  window.location.hostname === "localhost" ||
+    // [::1] is the IPv6 localhost address.
+    window.location.hostname === "[::1]" ||
+    // 127.0.0.0/8 are considered localhost for IPv4.
+    window.location.hostname.match(
+      /^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/,
+    ),
+)
+
+type Config = {
+  onSuccess?: (registration: ServiceWorkerRegistration) => void
+  onUpdate?: (registration: ServiceWorkerRegistration) => void
+}
+
+export function register(config?: Config) {
+  if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+    // The URL constructor is available in all browsers that support SW.
+    const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href)
+    if (publicUrl.origin !== window.location.origin) {
+      // Our service worker won't work if PUBLIC_URL is on a different origin
+      // from what our page is served on. This might happen if a CDN is used to
+      // serve assets; see https://github.com/facebook/create-react-app/issues/2374
+      return
+    }
+
+    window.addEventListener("load", () => {
+      const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`
+
+      if (isLocalhost) {
+        // This is running on localhost. Let's check if a service worker still exists or not.
+        checkValidServiceWorker(swUrl, config)
+
+        // Add some additional logging to localhost, pointing developers to the
+        // service worker/PWA documentation.
+        navigator.serviceWorker.ready.then(() => {
+          console.log(
+            "This web app is being served cache-first by a service " +
+              "worker. To learn more, visit https://cra.link/PWA",
+          )
+        })
+      } else {
+        // Is not localhost. Just register service worker
+        registerValidSW(swUrl, config)
+      }
+    })
+  }
+}
+
+function registerValidSW(swUrl: string, config?: Config) {
+  navigator.serviceWorker
+    .register(swUrl)
+    .then((registration) => {
+      registration.onupdatefound = () => {
+        const installingWorker = registration.installing
+        if (installingWorker == null) {
+          return
+        }
+        installingWorker.onstatechange = () => {
+          if (installingWorker.state === "installed") {
+            if (navigator.serviceWorker.controller) {
+              // At this point, the updated precached content has been fetched,
+              // but the previous service worker will still serve the older
+              // content until all client tabs are closed.
+              console.log(
+                "New content is available and will be used when all " +
+                  "tabs for this page are closed. See https://cra.link/PWA.",
+              )
+
+              // Execute callback
+              if (config && config.onUpdate) {
+                config.onUpdate(registration)
+              }
+            } else {
+              // At this point, everything has been precached.
+              // It is the perfect time to display a
+              // "Content is cached for offline use." message.
+              console.log("Content is cached for offline use.")
+
+              // Execute callback
+              if (config && config.onSuccess) {
+                config.onSuccess(registration)
+              }
+            }
+          }
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("Error during service worker registration:", error)
+    })
+}
+
+function checkValidServiceWorker(swUrl: string, config?: Config) {
+  // Check if the service worker can be found. If it can't reload the page.
+  fetch(swUrl, {
+    headers: { "Service-Worker": "script" },
+  })
+    .then((response) => {
+      // Ensure service worker exists, and that we really are getting a JS file.
+      const contentType = response.headers.get("content-type")
+      if (
+        response.status === 404 ||
+        (contentType != null && contentType.indexOf("javascript") === -1)
+      ) {
+        // No service worker found. Probably a different app. Reload the page.
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.unregister().then(() => {
+            window.location.reload()
+          })
+        })
+      } else {
+        // Service worker found. Proceed as normal.
+        registerValidSW(swUrl, config)
+      }
+    })
+    .catch(() => {
+      console.log(
+        "No internet connection found. App is running in offline mode.",
+      )
+    })
+}
+
+export function unregister() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.ready
+      .then((registration) => {
+        registration.unregister()
+      })
+      .catch((error) => {
+        console.error(error.message)
+      })
+  }
+}
+
+
+---------
+/// memory-app/src/setupTests.ts
+
+// jest-dom adds custom jest matchers for asserting on DOM nodes.
+// allows you to do things like:
+// expect(element).toHaveTextContent(/react/i)
+// learn more: https://github.com/testing-library/jest-dom
+import "@testing-library/jest-dom"
+
+
+---------
+/// memory-app/src/store/index.ts
+
+import { create } from "zustand";
+
+interface UserState {
+  token: string | null;
+  setToken: (token: string) => void;
+  clearToken: () => void;
+}
+
+const useUserStore = create<UserState>((set) => ({
+  token: null,
+  setToken: (token: string) => set({ token }),
+  clearToken: () => set({ token: null }),
+}));
+
+export default useUserStore;
+
+
+---------
+/// memory-app/src/test-utils.tsx
+
+import * as React from "react"
+import { render, RenderOptions } from "@testing-library/react"
+import { ChakraProvider, theme } from "@chakra-ui/react"
+
+const AllProviders = ({ children }: { children?: React.ReactNode }) => (
+  <ChakraProvider theme={theme}>{children}</ChakraProvider>
+)
+
+const customRender = (ui: React.ReactElement, options?: RenderOptions) =>
+  render(ui, { wrapper: AllProviders, ...options })
+
+export { customRender as render }
+
+
+---------
+/// memory-app/src/theme/theme.ts
+
+import { extendTheme } from '@chakra-ui/react';
+
+const customTheme = extendTheme({
+  colors: {
+    primary: {
+      100: '#E3F2FD',
+      200: '#BBDEFB',
+      300: '#90CAF9',
+    },
+  },
+  fonts: {
+    heading: `'Roboto', sans-serif`,
+    body: `'Open Sans', sans-serif`,
+  },
+});
+
+export default customTheme;
+
+export {
+  customTheme
+}
+

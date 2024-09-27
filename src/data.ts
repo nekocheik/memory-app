@@ -1,9 +1,9 @@
-import type { StructuresTypes } from "./Types/index";
+import type { KnowledgeSets } from "./Types/index";
 
-const data : StructuresTypes = [
+const data: KnowledgeSets = [
   {
     name: "Chemical Elements and Symbols",
-    id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
+    _id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
     cards: [
       {
         question: "What is 2 + 2?",
