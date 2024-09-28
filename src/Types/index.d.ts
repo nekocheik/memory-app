@@ -18,6 +18,7 @@ export interface MemoryCardType {
   answers: Answer[];
   answer: string;
   isResolve: boolean;
+  _id: string;
 }
 
 export type ID = string;

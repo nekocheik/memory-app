@@ -143,7 +143,7 @@ export interface Answer {
 
 export interface KnowledgeSet {
   name: string;
-  id: string;
+  _id: string;
   cards: MemoryCardType[];
 }
 
@@ -218,7 +218,6 @@ export const Header = ({
 ---------
 /// memory-app/src/components/MemoryCardsList.tsx
 
-import { useApi } from "../hooks/useApi";
 import { Stack, Card, CardBody, Text } from "@chakra-ui/react";
 import { NavLink } from "react-router-dom";
 
@@ -229,6 +228,7 @@ export const MemoryCardsList = ({
 }: {
   memoryCards: KnowledgeSets;
 }) => {
+  console.log(memoryCards);
   return (
     <Stack mt={4}>
       {memoryCards.map((card) => (
@@ -461,7 +461,7 @@ import type { KnowledgeSets } from "./Types/index";
 const data: KnowledgeSets = [
   {
     name: "Chemical Elements and Symbols",
-    id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
+    _id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
     cards: [
       {
         question: "What is 2 + 2?",
@@ -683,8 +683,31 @@ const getUserKnowledgeSets = async () => {
   }
 };
 
+const getKnowledgeSetById = async (id: string) => {
+  try {
+    const response = await api.get(`${PATH.knowledgeSets}/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
+const getQuestion = async (knowledgeId: string, id: string) => {
+  try {
+    const response = await api.get(
+      `${PATH.knowledgeSets}/${knowledgeId}/${id}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
 export const useApi = () => {
   return {
+    getKnowledgeSetById,
     addKnowledgeSet,
     signup,
     login,
@@ -779,71 +802,40 @@ export const Card = () => {
 
 import { Text, Flex, Stack } from "@chakra-ui/react";
 import { useParams } from "react-router-dom";
-import type {
-  GameMode,
-  KnowledgeSet,
-  MemoryCardType,
-  Answer,
-} from "../Types/index";
-
+import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
-
 import { Quiz } from "../components/Quiz";
-import { useCallback, useState } from "react";
-import { useQuery } from "../hooks/useQuery";
-
-import { data } from "../data";
-let data2 = data as KnowledgeSet[];
-
-function getStructure({ id }: { id: string }): KnowledgeSet {
-  console.log(id);
-  return data2.find(({ id: idC }) => idC === id) as KnowledgeSet;
-}
-
-const useViewMode = (gameMode: GameMode, id: string) => {
-  const { Q }: { Q: string } = useQuery();
-
-  const question = getQuestion(
-    getMemoryCard({
-      cards: getStructure({ id }),
-      Q: Q,
-    })
-  );
-
-  if (gameMode === "Quiz") {
-    return <Quiz currentQuestion={question} />;
-  } else if (gameMode === "Repetition") {
-    return <div>Mode 2 view</div>;
-  } else {
-    return <div>Unknown game mode</div>;
-  }
-};
-
-const getMemoryCard = ({ cards, Q }: { cards: KnowledgeSet; Q: string }) => {
-  console.log(cards);
-  if (Q) {
-    return cards.cards[Q as any];
-  } else {
-    return cards.cards[0];
-  }
-};
-
-const getQuestion = (
-  card: MemoryCardType
-): {
-  question: string;
-  answer: string;
-  isResolve: boolean;
-  answers: Answer[];
-} => {
-  return card;
-};
+import { useApi } from "../hooks/useApi";
+import { MemoryCardType } from "../Types";
 
 export const GameModes = () => {
   const { gameMode = "Quiz", id = "0" } = useParams<{
-    gameMode: GameMode;
+    gameMode: string;
     id: string;
   }>();
+  const [knowledgeSet, setKnowledgeSet] = useState<MemoryCardType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { getKnowledgeSetById } = useApi();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await getKnowledgeSetById(id);
+        setKnowledgeSet(data?.data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load knowledge set.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id, getKnowledgeSetById]);
+
+  if (loading) return <Text>Loading...</Text>;
+  if (error) return <Text>{error}</Text>;
 
   return (
     <Stack>
@@ -853,7 +845,10 @@ export const GameModes = () => {
         <Text>10s</Text>
       </Flex>
 
-      {useViewMode(gameMode, id)}
+      {gameMode === "Quiz" && knowledgeSet && (
+        <Quiz currentQuestion={knowledgeSet} />
+      )}
+      {/* Add conditions for other game modes if needed */}
     </Stack>
   );
 };

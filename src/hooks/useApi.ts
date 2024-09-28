@@ -124,7 +124,19 @@ const getUserKnowledgeSets = async () => {
 
 const getKnowledgeSetById = async (id: string) => {
   try {
-    const response = await api.get(`/api/knowledge-set/${id}`);
+    const response = await api.get(`${PATH.knowledgeSets}/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
+const getQuestion = async (knowledgeId: string, id: string) => {
+  try {
+    const response = await api.get(
+      `${PATH.knowledgeSets}/${knowledgeId}/${id}`
+    );
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge set:", error);
