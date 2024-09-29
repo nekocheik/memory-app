@@ -1,0 +1,635 @@
+/// memory-app/src/components/RealTimeGame.tsx
+
+import React from "react";
+import { Box, Text, Button, VStack, HStack, Progress } from "@chakra-ui/react";
+import useRealTimeGame from "../hooks/useRealTimeGame";
+import useGameStore from "../store/gameStore";
+import { MCard } from "./GameMode/Card";
+
+interface RealTimeGameProps {
+  knowledgeSetId: string;
+  sessionId: string | null;
+}
+
+const RealTimeGame: React.FC<RealTimeGameProps> = ({
+  knowledgeSetId,
+  sessionId,
+}) => {
+  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
+    useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const { currentQuestion, feedback, showNextButton } = useGameStore();
+
+  if (!currentQuestion) {
+    return <Text>Waiting for the game to start...</Text>;
+  }
+
+  return (
+    <VStack spacing={4} align="stretch">
+      <Box>
+        <Text fontWeight="bold">Game Time Remaining:</Text>
+        <Text>
+          {Math.floor(gameTimer / 60)}:
+          {(gameTimer % 60).toString().padStart(2, "0")}
+        </Text>
+        <Progress value={(gameTimer / 300) * 100} />
+      </Box>
+
+      <MCard text={currentQuestion.question} />
+
+      <Box>
+        <Text fontWeight="bold">Time Remaining for this Question:</Text>
+        <Text>{Math.ceil(questionTimer)} seconds</Text>
+        <Progress value={(questionTimer / 10) * 100} colorScheme="green" />
+      </Box>
+
+      <HStack spacing={4} wrap="wrap" justify="center">
+        {currentQuestion.answers.map((answer, index) => (
+          <Button
+            key={index}
+            onClick={() => handleAnswer(answer.text)}
+            colorScheme="blue"
+            isDisabled={questionTimer === 0 || showNextButton}
+          >
+            {answer.text}
+          </Button>
+        ))}
+      </HStack>
+
+      {feedback && (
+        <Box
+          p={3}
+          bg={feedback.includes("Correct") ? "green.100" : "red.100"}
+          borderRadius="md"
+        >
+          <Text fontWeight="bold">{feedback}</Text>
+        </Box>
+      )}
+
+      {showNextButton && (
+        <Button onClick={handleNextQuestion} colorScheme="teal">
+          Next Question
+        </Button>
+      )}
+    </VStack>
+  );
+};
+
+export default RealTimeGame;
+
+
+---------
+/// memory-app/src/hooks/useApi.ts
+
+import axios from "axios";
+import useUserStore from "../store";
+
+const api = axios.create({
+  baseURL: process.env.REACT_APP_BACKEND_URI,
+  timeout: 10000,
+  headers: { "X-Custom-Header": "foobar" },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    console.log("Request made to:", config.url);
+    console.log("Request data:", config.data);
+    return config;
+  },
+  (error) => {
+    console.error("Error in request:", error);
+    return Promise.reject(error);
+  }
+);
+
+api.interceptors.response.use(
+  (response) => {
+    console.log("Response received from:", response.config.url);
+    console.log("Response data:", response.data);
+    return response;
+  },
+  (error) => {
+    console.error("Error in response:", error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Erreur dans la requête:", error);
+    return Promise.reject(error);
+  }
+);
+
+const PATH = {
+  signup: "/api/user/signup",
+  login: "/api/user/login",
+  knowledgeAdd: "/api/knowledge-set/add",
+  activeSessions: "/api/game/sessions/active",
+  knowledgeSets: "/api/knowledge-set",
+};
+
+const setToken = (token: string) => {
+  const userStore = useUserStore.getState(); // Utiliser le store directement
+  userStore.setToken(token);
+  localStorage.setItem("access_token", token);
+  console.log("Token set:", token);
+};
+
+const signup = async ({
+  username,
+  email,
+  password,
+}: {
+  username: string;
+  email: string;
+  password: string;
+}) => {
+  try {
+    const response = await api.post(PATH.signup, { username, email, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
+  } catch (error) {
+    console.error("Failed to signup:", error);
+    throw new Error("Failed to signup");
+  }
+};
+
+const login = async ({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+}) => {
+  try {
+    const response = await api.post(PATH.login, { username, password });
+    const token = response?.data?.access_token;
+    if (token) {
+      setToken(token);
+    }
+    return response;
+  } catch (error) {
+    console.error("Failed to login:", error);
+    throw new Error("Failed to login");
+  }
+};
+
+const addKnowledgeSet = async (KnowledgeSet: any) => {
+  try {
+    const response = await api.post(PATH.knowledgeAdd, {
+      ...KnowledgeSet,
+    });
+    console.log("Knowledge set added:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to add knowledge set:", error);
+    throw error;
+  }
+};
+
+const getUserKnowledgeSets = async () => {
+  try {
+    const response = await api.get(PATH.knowledgeSets);
+    console.log("Fetched user knowledge sets:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge sets:", error);
+    throw error;
+  }
+};
+
+const getKnowledgeSetById = async (id: string) => {
+  try {
+    const response = await api.get(`${PATH.knowledgeSets}/${id}`);
+    console.log("Fetched knowledge set by id:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
+const getQuestion = async (knowledgeId: string, id: string) => {
+  try {
+    const response = await api.get(
+      `${PATH.knowledgeSets}/${knowledgeId}/${id}`
+    );
+    console.log("Fetched question:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch knowledge set:", error);
+    throw error;
+  }
+};
+
+const getActiveSessions = async () => {
+  try {
+    const response = await api.get(`${PATH.activeSessions}`);
+    console.log("Fetched active sessions:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch active sessions:", error);
+    throw error;
+  }
+};
+
+export const useApi = () => {
+  return {
+    getKnowledgeSetById,
+    getQuestion,
+    addKnowledgeSet,
+    signup,
+    login,
+    getActiveSessions,
+    getUserKnowledgeSets,
+  };
+};
+
+
+---------
+/// memory-app/src/hooks/useQuery.ts
+
+import { useLocation } from "react-router-dom";
+
+export const useQuery = (): { Q: string } => {
+  return new URLSearchParams(useLocation().search) as any;
+};
+
+
+---------
+/// memory-app/src/hooks/useRealTimeGame.ts
+
+import { useState, useEffect, useCallback } from "react";
+import { io, Socket } from "socket.io-client";
+import useGameStore from "../store/gameStore";
+
+const SOCKET_SERVER_URL =
+  process.env.REACT_APP_SOCKET_SERVER_URL || "http://localhost:8000";
+
+interface UseRealTimeGameReturn {
+  gameTimer: number;
+  questionTimer: number;
+  handleAnswer: (answer: string) => void;
+  handleNextQuestion: () => void;
+}
+
+const useRealTimeGame = (
+  knowledgeSetId: string,
+  sessionId?: string
+): UseRealTimeGameReturn => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const {
+    setCurrentQuestion,
+    setQuestionTimer,
+    setFeedback,
+    setShowNextButton,
+    setCorrectAnswer,
+    setCurrentQuestionIndex,
+    setTotalQuestions,
+    questionTimer,
+    gameTimer,
+    setGameTimer,
+  } = useGameStore();
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const newSocket = io(SOCKET_SERVER_URL, {
+      auth: {
+        token: token,
+      },
+    });
+    setSocket(newSocket);
+
+    newSocket.on("connect_error", (err) => {
+      console.error("Socket connection error:", err.message);
+    });
+
+    if (sessionId) {
+      newSocket.emit("resumeGame", sessionId);
+    } else {
+      newSocket.emit("startGame", knowledgeSetId);
+    }
+
+    newSocket.on("newQuestion", (questionData: any) => {
+      console.log("Received newQuestion:", questionData);
+      setCurrentQuestion({
+        _id: questionData._id,
+        question: questionData.question,
+        answers: questionData.answers,
+        answer: "",
+        isResolve: false,
+      });
+      setFeedback("");
+      setShowNextButton(false);
+
+      setCurrentQuestionIndex(questionData.currentQuestionIndex);
+      setTotalQuestions(questionData.totalQuestions);
+
+      const { timeRemaining } = questionData;
+      setQuestionTimer(timeRemaining);
+    });
+
+    newSocket.on("feedback", (result: any) => {
+      console.log("Received feedback:", result);
+      if (result.timeUp) {
+        setFeedback(
+          "Temps écoulé ! La bonne réponse était : " + result.correctAnswer
+        );
+      } else {
+        setFeedback(
+          result.correct
+            ? "Correct !"
+            : `Incorrect. La bonne réponse était : ${result.correctAnswer}`
+        );
+      }
+      setCorrectAnswer(result.correctAnswer);
+      setShowNextButton(result.showNextButton);
+    });
+
+    newSocket.on("gameOver", (data: any) => {
+      console.log("Received gameOver:", data);
+      setFeedback("Partie terminée ! Votre score : " + data.score);
+      setGameTimer(0);
+    });
+
+    newSocket.on("error", (message: string) => {
+      console.error("Socket error:", message);
+      setFeedback("Erreur : " + message);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [
+    knowledgeSetId,
+    sessionId,
+    setCurrentQuestion,
+    setQuestionTimer,
+    setFeedback,
+    setShowNextButton,
+    setCurrentQuestionIndex,
+    setTotalQuestions,
+    setGameTimer,
+    setCorrectAnswer,
+  ]);
+
+  useEffect(() => {
+    if (questionTimer <= 0) return;
+
+    const interval = setInterval(() => {
+      setQuestionTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [questionTimer, setQuestionTimer]);
+
+  useEffect(() => {
+    if (gameTimer <= 0) return;
+
+    const interval = setInterval(() => {
+      setGameTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameTimer, setGameTimer]);
+
+  const handleAnswer = useCallback(
+    (answer: string) => {
+      console.log("Submitting answer:", answer);
+      socket?.emit("submitAnswer", {
+        answer,
+      });
+    },
+    [socket]
+  );
+
+  const handleNextQuestion = useCallback(() => {
+    console.log("Requesting next question");
+    socket?.emit("nextQuestion");
+    setCorrectAnswer(null); // Réinitialise la bonne réponse
+  }, [socket, setCorrectAnswer]);
+
+  return {
+    gameTimer,
+    questionTimer,
+    handleAnswer,
+    handleNextQuestion,
+  };
+};
+
+export default useRealTimeGame;
+
+
+---------
+/// memory-app/src/pages/GameModes.tsx
+
+import React, { useEffect, useState } from "react";
+import { Text, Flex, Stack, Progress, Button } from "@chakra-ui/react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { Header } from "../components/Header";
+import { Quiz } from "../components/Quiz";
+import RealTimeGame from "../components/RealTimeGame";
+import { useApi } from "../hooks/useApi";
+import useGameStore from "../store/gameStore";
+import { KnowledgeSet } from "../Types";
+
+export const GameModes = () => {
+  const { gameMode = "Quiz", id = "0" } = useParams<{
+    gameMode: string;
+    id: string;
+  }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const sessionId = new URLSearchParams(location.search).get("sessionId");
+  const {
+    gameTimer,
+    feedback,
+    setGameTimer,
+    setQuestions,
+    currentQuestionIndex,
+    totalQuestions,
+    questions,
+  } = useGameStore();
+  const { getKnowledgeSetById } = useApi();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [knowledgeSet, setKnowledgeSet] = useState<KnowledgeSet | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log("Fetching knowledge set with id:", id);
+        setIsLoading(true);
+        const response = await getKnowledgeSetById(id);
+        const data = response.data as KnowledgeSet;
+        if (data && data.cards && data.cards.length > 0) {
+          setKnowledgeSet(data);
+          setQuestions(data.cards);
+          setGameTimer(data.timeLimit || 300); // Utilise le temps total spécifique
+        } else {
+          setError("No questions found in this knowledge set.");
+        }
+      } catch (err) {
+        console.error("Failed to load knowledge set:", err);
+        setError("Failed to load questions. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [id, getKnowledgeSetById, setQuestions, setGameTimer]);
+
+  const handleEndGame = () => {
+    // Ici, vous pouvez ajouter la logique pour sauvegarder les résultats du jeu si nécessaire
+    navigate("/"); // Retourne à la page d'accueil
+  };
+
+  if (isLoading) return <Text>Loading...</Text>;
+  if (error) return <Text color="red.500">{error}</Text>;
+
+  return (
+    <Stack spacing={4}>
+      <Header hiddenButton={true} />
+      <Flex justify="space-between" align="center">
+        <Text fontSize="2xl" fontWeight="bold">
+          {knowledgeSet?.name}
+        </Text>
+        <Text>
+          Temps de jeu : {Math.floor(gameTimer / 60)}:
+          {(gameTimer % 60).toString().padStart(2, "0")}
+        </Text>
+      </Flex>
+      <Progress value={(gameTimer / (knowledgeSet?.timeLimit || 300)) * 100} />
+
+      {gameMode === "Quiz" && (
+        <Quiz knowledgeSetId={id} sessionId={sessionId} />
+      )}
+      {gameMode === "RealTime" && (
+        <RealTimeGame knowledgeSetId={id} sessionId={sessionId} />
+      )}
+
+      <Text mt={4}>{feedback}</Text>
+
+      <Flex justify="space-between">
+        <Text>
+          Question {currentQuestionIndex + 1} sur {totalQuestions}
+        </Text>
+        <Button onClick={handleEndGame} colorScheme="red">
+          Terminer la partie
+        </Button>
+      </Flex>
+    </Stack>
+  );
+};
+
+export default GameModes;
+
+
+---------
+/// memory-app/src/store/gameStore.ts
+
+import { create } from "zustand";
+import { MemoryCardType } from "../Types";
+
+interface GameState {
+  currentQuestion: MemoryCardType | null;
+  questions: MemoryCardType[];
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  gameTimer: number;
+  questionTimer: number;
+  feedback: string;
+  showNextButton: boolean;
+  correctAnswer: string | null;
+  setCurrentQuestion: (question: MemoryCardType) => void;
+  setGameTimer: (timer: number | ((prev: number) => number)) => void;
+  setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
+  setFeedback: (feedback: string) => void;
+  setShowNextButton: (show: boolean) => void;
+  setCorrectAnswer: (answer: string | null) => void;
+  setCurrentQuestionIndex: (index: number) => void;
+  setTotalQuestions: (total: number) => void;
+  nextQuestion: () => void;
+  setQuestions: (questions: MemoryCardType[]) => void;
+}
+
+const useGameStore = create<GameState>((set) => ({
+  currentQuestion: null,
+  questions: [],
+  currentQuestionIndex: 0,
+  totalQuestions: 0,
+  gameTimer: 300,
+  questionTimer: 10,
+  feedback: "",
+  showNextButton: false,
+  correctAnswer: null,
+  setCurrentQuestion: (question) => {
+    console.log("Setting currentQuestion:", question);
+    set({ currentQuestion: question });
+  },
+  setGameTimer: (timer) =>
+    set((state) => {
+      const newTimer =
+        typeof timer === "function" ? timer(state.gameTimer) : timer;
+      console.log("Setting gameTimer:", newTimer);
+      return { gameTimer: newTimer };
+    }),
+  setQuestionTimer: (timer) =>
+    set((state) => {
+      const newTimer =
+        typeof timer === "function" ? timer(state.questionTimer) : timer;
+      console.log("Setting questionTimer:", newTimer);
+      return { questionTimer: newTimer };
+    }),
+  setFeedback: (feedback) => {
+    console.log("Setting feedback:", feedback);
+    set({ feedback });
+  },
+  setShowNextButton: (show) => {
+    console.log("Setting showNextButton:", show);
+    set({ showNextButton: show });
+  },
+  setCorrectAnswer: (answer) => {
+    console.log("Setting correctAnswer:", answer);
+    set({ correctAnswer: answer });
+  },
+  setCurrentQuestionIndex: (index) => {
+    console.log("Setting currentQuestionIndex:", index);
+    set({ currentQuestionIndex: index });
+  },
+  setTotalQuestions: (total) => {
+    console.log("Setting totalQuestions:", total);
+    set({ totalQuestions: total });
+  },
+  nextQuestion: () =>
+    set((state) => {
+      const nextIndex = state.currentQuestionIndex + 1;
+      if (nextIndex < state.questions.length) {
+        console.log("Moving to next question, index:", nextIndex);
+        return {
+          currentQuestionIndex: nextIndex,
+          currentQuestion: state.questions[nextIndex],
+          questionTimer: 10,
+          showNextButton: false,
+        };
+      }
+      return state;
+    }),
+  setQuestions: (questions) => {
+    console.log("Setting questions:", questions);
+    set({ questions, currentQuestion: questions[0] });
+  },
+}));
+
+export default useGameStore;
+

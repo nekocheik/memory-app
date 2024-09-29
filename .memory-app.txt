@@ -16,18 +16,13 @@ test("renders learn react link", () => {
 /// memory-app/src/App.tsx
 
 import * as React from "react";
-
 import { ChakraProvider, Stack } from "@chakra-ui/react";
-
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
 } from "react-router-dom";
-
-///memory-card/:id
-
 import { HomePage } from "./pages/HomePage";
 import { Card } from "./pages/Card";
 import { GameModes } from "./pages/GameModes";
@@ -58,7 +53,14 @@ export const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/card/:id/:gameMode" element={<GameModes />} />
+          <Route
+            path="/card/:id/:gameMode"
+            element={
+              <ProtectedRoute>
+                <GameModes />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<div>404 - Page not found</div>} />
         </Routes>
       </Stack>
@@ -136,15 +138,16 @@ export const Logo = forwardRef<ImageProps, "img">((props, ref) => {
 
 export interface Answer {
   text: string;
-  isCorrect: boolean;
-  count: number;
-  proximity: number;
+  isCorrect?: boolean;
+  count?: number;
+  proximity?: number;
 }
 
 export interface KnowledgeSet {
   name: string;
   _id: string;
   cards: MemoryCardType[];
+  timeLimit?: number; // Ajout du temps total pour l'ensemble
 }
 
 export type KnowledgeSets = KnowledgeSet[];
@@ -152,8 +155,10 @@ export type KnowledgeSets = KnowledgeSet[];
 export interface MemoryCardType {
   question: string;
   answers: Answer[];
-  answer: string;
-  isResolve: boolean;
+  answer?: string;
+  isResolve?: boolean;
+  _id: string;
+  timeLimit?: number; // Ajout du temps pour chaque question
 }
 
 export type ID = string;
@@ -254,6 +259,7 @@ import type { GameMode } from "../Types/index";
 
 export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
   function selectMode(mode: GameMode) {
+    console.log({ cardId });
     const newPath = `/card/${cardId}/${mode}`;
     window.location.href = newPath;
   }
@@ -313,30 +319,183 @@ export default ProtectedRoute;
 ---------
 /// memory-app/src/components/Quiz.tsx
 
-import React from "react";
-import { MCard } from "../components/GameMode/Card";
-import { Stack, Text } from "@chakra-ui/react";
-import { MemoryCardType } from "../Types";
+import React, { useState, useEffect } from "react";
+import { Stack, Text, Button, VStack, Box } from "@chakra-ui/react";
+import { MCard } from "./GameMode/Card";
+import useGameStore from "../store/gameStore";
+import useRealTimeGame from "../hooks/useRealTimeGame";
 
-export const Quiz = ({
-  currentQuestion,
-}: {
-  currentQuestion: MemoryCardType;
-}) => {
+interface QuizProps {
+  knowledgeSetId: string;
+  sessionId: string | null;
+}
+
+export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
+  const {
+    currentQuestion,
+    feedback,
+    correctAnswer,
+    setCorrectAnswer,
+    currentQuestionIndex,
+    totalQuestions,
+  } = useGameStore();
+  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
+    useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+
+  // Vérifier la valeur de correctAnswer
+  useEffect(() => {
+    console.log("Correct Answer:", correctAnswer);
+  }, [correctAnswer]);
+
+  if (!currentQuestion) {
+    return <Text>Chargement de la question...</Text>;
+  }
+
+  const onAnswerClick = (answer: string) => {
+    if (isAnswered) return;
+    setSelectedAnswer(answer);
+    setIsAnswered(true);
+    handleAnswer(answer);
+  };
+
+  const onNextClick = () => {
+    handleNextQuestion();
+    setSelectedAnswer(null);
+    setIsAnswered(false);
+    setCorrectAnswer(null); // Réinitialise la bonne réponse
+  };
+
   return (
-    <Stack>
+    <VStack spacing={4}>
       <MCard text={currentQuestion.question} />
-      <Stack>
-        <Text>Réponse </Text>
-        {currentQuestion.answers.map((answer) => {
-          return <MCard onClick={() => {}} answer={answer} />;
-        })}
+      <Text>
+        Temps de jeu : {Math.floor(gameTimer / 60)}:
+        {(gameTimer % 60).toString().padStart(2, "0")}
+      </Text>
+      <Text>
+        Temps pour cette question : {Math.ceil(questionTimer)} secondes
+      </Text>
+      <Text>
+        Question {currentQuestionIndex + 1} sur {totalQuestions}
+      </Text>
+      <Stack width="100%">
+        {currentQuestion.answers.map((answer, index) => (
+          <Button
+            key={index}
+            onClick={() => onAnswerClick(answer.text)}
+            colorScheme={
+              isAnswered
+                ? answer.isCorrect
+                  ? "green"
+                  : selectedAnswer === answer.text
+                  ? "red"
+                  : "gray"
+                : "blue"
+            }
+            disabled={isAnswered}
+            width="100%"
+          >
+            {answer.text}
+          </Button>
+        ))}
       </Stack>
-    </Stack>
+      {isAnswered && (
+        <Box width="100%" textAlign="center">
+          <Text fontWeight="bold" mb={2}>
+            {feedback}
+          </Text>
+          <Button colorScheme="blue" onClick={onNextClick} width="100%">
+            Question Suivante
+          </Button>
+        </Box>
+      )}
+    </VStack>
   );
 };
 
 export default Quiz;
+
+
+---------
+/// memory-app/src/components/RealTimeGame.tsx
+
+import React from "react";
+import { Box, Text, Button, VStack, HStack, Progress } from "@chakra-ui/react";
+import useRealTimeGame from "../hooks/useRealTimeGame";
+import useGameStore from "../store/gameStore";
+import { MCard } from "./GameMode/Card";
+
+interface RealTimeGameProps {
+  knowledgeSetId: string;
+  sessionId: string | null;
+}
+
+const RealTimeGame: React.FC<RealTimeGameProps> = ({
+  knowledgeSetId,
+  sessionId,
+}) => {
+  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
+    useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const { currentQuestion, feedback, showNextButton } = useGameStore();
+
+  if (!currentQuestion) {
+    return <Text>Waiting for the game to start...</Text>;
+  }
+
+  return (
+    <VStack spacing={4} align="stretch">
+      <Box>
+        <Text fontWeight="bold">Game Time Remaining:</Text>
+        <Text>
+          {Math.floor(gameTimer / 60)}:
+          {(gameTimer % 60).toString().padStart(2, "0")}
+        </Text>
+        <Progress value={(gameTimer / 300) * 100} />
+      </Box>
+
+      <MCard text={currentQuestion.question} />
+
+      <Box>
+        <Text fontWeight="bold">Time Remaining for this Question:</Text>
+        <Text>{Math.ceil(questionTimer)} seconds</Text>
+        <Progress value={(questionTimer / 10) * 100} colorScheme="green" />
+      </Box>
+
+      <HStack spacing={4} wrap="wrap" justify="center">
+        {currentQuestion.answers.map((answer, index) => (
+          <Button
+            key={index}
+            onClick={() => handleAnswer(answer.text)}
+            colorScheme="blue"
+            isDisabled={questionTimer === 0 || showNextButton}
+          >
+            {answer.text}
+          </Button>
+        ))}
+      </HStack>
+
+      {feedback && (
+        <Box
+          p={3}
+          bg={feedback.includes("Correct") ? "green.100" : "red.100"}
+          borderRadius="md"
+        >
+          <Text fontWeight="bold">{feedback}</Text>
+        </Box>
+      )}
+
+      {showNextButton && (
+        <Button onClick={handleNextQuestion} colorScheme="teal">
+          Next Question
+        </Button>
+      )}
+    </VStack>
+  );
+};
+
+export default RealTimeGame;
 
 
 ---------
@@ -374,7 +533,21 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Box,
+  VStack,
+  HStack,
+  Checkbox,
+  IconButton,
+  NumberInput,
+  NumberInputField,
+  useToast,
 } from "@chakra-ui/react";
+import { AddIcon, DeleteIcon } from "@chakra-ui/icons";
 import { useApi } from "../../hooks/useApi";
 
 export function ModalAddKnowledgeSet({
@@ -384,71 +557,372 @@ export function ModalAddKnowledgeSet({
 }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { addKnowledgeSet } = useApi();
-  const [KnowledgeSet, setKnowledgeSet] = useState({
-    name: "",
-    cards: [],
-  });
-  const [cardsInput, setCardsInput] = useState("");
+  const toast = useToast();
+
+  const [mode, setMode] = useState<"text" | "form">("form");
+
+  // États pour le mode formulaire
+  const [knowledgeSetName, setKnowledgeSetName] = useState("");
+  const [knowledgeSetTimeLimit, setKnowledgeSetTimeLimit] = useState(300);
+  const [cards, setCards] = useState([
+    {
+      question: "",
+      answers: [{ text: "", isCorrect: false }],
+      timeLimit: 15,
+    },
+  ]);
+
+  // État pour le mode texte
+  const [jsonInput, setJsonInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    openModal(onOpen);
+  }, [openModal, onOpen]);
+
+  // Synchroniser les données lorsque le mode change
+  useEffect(() => {
+    if (mode === "text") {
+      // Convertir les données du formulaire en JSON
+      const knowledgeSet = {
+        name: knowledgeSetName,
+        timeLimit: knowledgeSetTimeLimit,
+        cards: cards,
+      };
+      setJsonInput(JSON.stringify(knowledgeSet, null, 2));
+    } else if (mode === "form") {
+      // Tenter de parser le JSON et mettre à jour les états du formulaire
+      try {
+        if (jsonInput.trim() !== "") {
+          const parsedData = JSON.parse(jsonInput);
+          setKnowledgeSetName(parsedData.name || "");
+          setKnowledgeSetTimeLimit(parsedData.timeLimit || 300);
+          setCards(parsedData.cards || []);
+          setErrorMessage("");
+        }
+      } catch (error) {
+        setErrorMessage(
+          "Le format JSON est invalide. Veuillez corriger les erreurs avant de passer en mode formulaire."
+        );
+        // Rester en mode texte si le JSON est invalide
+        setMode("text");
+        toast({
+          title: "Erreur de format JSON",
+          description:
+            "Le format JSON est invalide. Veuillez corriger les erreurs avant de passer en mode formulaire.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  // Fonction pour gérer le changement de mode
+  const handleModeChange = (index: number) => {
+    const newMode = index === 0 ? "form" : "text";
+    setMode(newMode);
+  };
+
+  // Fonction de validation des cartes
+  const validateCards = (cards: any[]) => {
+    for (const card of cards) {
+      if (!card.question || card.question.trim() === "") {
+        setErrorMessage("Chaque carte doit avoir une question.");
+        return false;
+      }
+      if (!Array.isArray(card.answers) || card.answers.length === 0) {
+        setErrorMessage("Chaque carte doit avoir au moins une réponse.");
+        return false;
+      }
+      const hasCorrectAnswer = card.answers.some((a: any) => a.isCorrect);
+      if (!hasCorrectAnswer) {
+        setErrorMessage(
+          "Chaque carte doit avoir au moins une réponse correcte."
+        );
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleSubmit = async () => {
     try {
-      const parsedCards = JSON.parse(cardsInput);
-      setKnowledgeSet({ ...KnowledgeSet, cards: parsedCards });
-      await addKnowledgeSet({ ...KnowledgeSet, cards: parsedCards });
+      let knowledgeSetData;
+      if (mode === "text") {
+        knowledgeSetData = JSON.parse(jsonInput);
+        // Valider les données du JSON
+        if (!knowledgeSetData.name || knowledgeSetData.name.trim() === "") {
+          setErrorMessage("Le nom du knowledge set est requis.");
+          return;
+        }
+        if (!Array.isArray(knowledgeSetData.cards)) {
+          setErrorMessage("Les cartes doivent être un tableau.");
+          return;
+        }
+        if (!validateCards(knowledgeSetData.cards)) {
+          return;
+        }
+      } else {
+        // Mode formulaire
+        knowledgeSetData = {
+          name: knowledgeSetName,
+          timeLimit: knowledgeSetTimeLimit,
+          cards: cards,
+        };
+        // Valider les données du formulaire
+        if (!knowledgeSetName || knowledgeSetName.trim() === "") {
+          setErrorMessage("Le nom du knowledge set est requis.");
+          return;
+        }
+        if (!validateCards(cards)) {
+          return;
+        }
+      }
+
+      await addKnowledgeSet(knowledgeSetData);
       setErrorMessage("");
       onClose();
+      toast({
+        title: "Succès",
+        description: "Le knowledge set a été ajouté avec succès.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
     } catch (error) {
-      setErrorMessage("Invalid JSON format. Please correct it.");
+      console.error(error);
+      setErrorMessage(
+        "Une erreur est survenue lors de l'ajout du knowledge set."
+      );
     }
   };
 
-  useEffect(() => {
-    openModal(() => onOpen);
-  }, []);
+  // Fonctions pour gérer les cartes et les réponses en mode formulaire
+  const addCard = () => {
+    setCards([
+      ...cards,
+      {
+        question: "",
+        answers: [{ text: "", isCorrect: false }],
+        timeLimit: 15,
+      },
+    ]);
+  };
+
+  const removeCard = (index: number) => {
+    const newCards = [...cards];
+    newCards.splice(index, 1);
+    setCards(newCards);
+  };
+
+  const handleCardChange = (index: number, field: string, value: any) => {
+    const newCards = [...cards];
+    (newCards as any)[index][field] = value;
+    setCards(newCards);
+  };
+
+  const addAnswer = (cardIndex: number) => {
+    const newCards = [...cards];
+    newCards[cardIndex].answers.push({ text: "", isCorrect: false });
+    setCards(newCards);
+  };
+
+  const removeAnswer = (cardIndex: number, answerIndex: number) => {
+    const newCards = [...cards];
+    newCards[cardIndex].answers.splice(answerIndex, 1);
+    setCards(newCards);
+  };
+
+  const handleAnswerChange = (
+    cardIndex: number,
+    answerIndex: number,
+    field: string,
+    value: any
+  ) => {
+    const newCards = [...cards];
+    (newCards as any)[cardIndex].answers[answerIndex][field] = value;
+    setCards(newCards);
+  };
 
   return (
-    <>
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Add New Knowledge Set</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl>
-              <FormLabel>Name</FormLabel>
-              <Input
-                placeholder="Set Name"
-                value={KnowledgeSet.name}
-                onChange={(e) =>
-                  setKnowledgeSet({ ...KnowledgeSet, name: e.target.value })
-                }
-              />
-            </FormControl>
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Ajouter un Nouveau Knowledge Set</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <Tabs
+            mt={4}
+            variant="enclosed"
+            isFitted
+            onChange={handleModeChange}
+            index={mode === "form" ? 0 : 1}
+          >
+            <TabList>
+              <Tab>Mode Formulaire</Tab>
+              <Tab>Mode Texte</Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel>
+                {/* Mode Formulaire */}
+                <FormControl>
+                  <FormLabel>Nom du Set</FormLabel>
+                  <Input
+                    placeholder="Nom du Set"
+                    value={knowledgeSetName}
+                    onChange={(e) => setKnowledgeSetName(e.target.value)}
+                  />
+                </FormControl>
 
-            <FormControl mt={4}>
-              <FormLabel>Cards (in JSON format)</FormLabel>
-              <Textarea
-                placeholder='Add cards as a JSON array (e.g., [{"question": "What is 2+2?", "answer": "4"}])'
-                value={cardsInput}
-                onChange={(e) => setCardsInput(e.target.value)} // Just update the string state
-              />
-            </FormControl>
+                <FormControl mt={4}>
+                  <FormLabel>Temps Total (secondes)</FormLabel>
+                  <NumberInput
+                    min={1}
+                    value={knowledgeSetTimeLimit}
+                    onChange={(valueString) =>
+                      setKnowledgeSetTimeLimit(parseInt(valueString))
+                    }
+                  >
+                    <NumberInputField />
+                  </NumberInput>
+                </FormControl>
 
-            {errorMessage && (
-              <p style={{ color: "red" }}>{errorMessage}</p> // Display the error message
-            )}
-          </ModalBody>
+                {cards.map((card, cardIndex) => (
+                  <Box
+                    key={cardIndex}
+                    borderWidth="1px"
+                    borderRadius="md"
+                    p={4}
+                    mt={4}
+                  >
+                    <HStack justifyContent="space-between">
+                      <FormLabel>Carte {cardIndex + 1}</FormLabel>
+                      <IconButton
+                        icon={<DeleteIcon />}
+                        aria-label="Supprimer la carte"
+                        size="sm"
+                        onClick={() => removeCard(cardIndex)}
+                        isDisabled={cards.length === 1}
+                      />
+                    </HStack>
+                    <FormControl mt={2}>
+                      <FormLabel>Question</FormLabel>
+                      <Input
+                        placeholder="Question"
+                        value={card.question}
+                        onChange={(e) =>
+                          handleCardChange(
+                            cardIndex,
+                            "question",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormControl mt={2}>
+                      <FormLabel>Limite de Temps (secondes)</FormLabel>
+                      <NumberInput
+                        min={1}
+                        value={card.timeLimit}
+                        onChange={(valueString) =>
+                          handleCardChange(
+                            cardIndex,
+                            "timeLimit",
+                            parseInt(valueString)
+                          )
+                        }
+                      >
+                        <NumberInputField />
+                      </NumberInput>
+                    </FormControl>
+                    <FormControl mt={2}>
+                      <FormLabel>Réponses</FormLabel>
+                      {card.answers.map((answer, answerIndex) => (
+                        <HStack key={answerIndex} mt={2}>
+                          <Input
+                            placeholder="Réponse"
+                            value={answer.text}
+                            onChange={(e) =>
+                              handleAnswerChange(
+                                cardIndex,
+                                answerIndex,
+                                "text",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <Checkbox
+                            isChecked={answer.isCorrect}
+                            onChange={(e) =>
+                              handleAnswerChange(
+                                cardIndex,
+                                answerIndex,
+                                "isCorrect",
+                                e.target.checked
+                              )
+                            }
+                          >
+                            Correcte
+                          </Checkbox>
+                          <IconButton
+                            icon={<DeleteIcon />}
+                            aria-label="Supprimer la réponse"
+                            size="sm"
+                            onClick={() => removeAnswer(cardIndex, answerIndex)}
+                            isDisabled={card.answers.length === 1}
+                          />
+                        </HStack>
+                      ))}
+                      <Button
+                        mt={2}
+                        size="sm"
+                        onClick={() => addAnswer(cardIndex)}
+                        leftIcon={<AddIcon />}
+                      >
+                        Ajouter une Réponse
+                      </Button>
+                    </FormControl>
+                  </Box>
+                ))}
+                <Button
+                  mt={4}
+                  onClick={addCard}
+                  leftIcon={<AddIcon />}
+                  colorScheme="blue"
+                >
+                  Ajouter une Carte
+                </Button>
+              </TabPanel>
+              <TabPanel>
+                {/* Mode Texte */}
+                <FormControl mt={4}>
+                  <FormLabel>Knowledge Set (au format JSON)</FormLabel>
+                  <Textarea
+                    placeholder='{"name": "Nom du Set", "timeLimit": 300, "cards": [...]}'
+                    value={jsonInput}
+                    onChange={(e) => setJsonInput(e.target.value)}
+                    height="400px"
+                  />
+                </FormControl>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
 
-          <ModalFooter>
-            <Button colorScheme="blue" onClick={handleSubmit} mr={3}>
-              Save
-            </Button>
-            <Button onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </>
+          {errorMessage && (
+            <p style={{ color: "red", marginTop: "10px" }}>{errorMessage}</p>
+          )}
+        </ModalBody>
+
+        <ModalFooter>
+          <Button colorScheme="blue" onClick={handleSubmit} mr={3}>
+            Enregistrer
+          </Button>
+          <Button onClick={onClose}>Annuler</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 
@@ -458,100 +932,7 @@ export function ModalAddKnowledgeSet({
 
 import type { KnowledgeSets } from "./Types/index";
 
-const data: KnowledgeSets = [
-  {
-    name: "Chemical Elements and Symbols",
-    _id: "3229898d-b7be-447d-8387-8f1ea433e5a1",
-    cards: [
-      {
-        question: "What is 2 + 2?",
-        answer: "4",
-        isResolve: true,
-        answers: [
-          { text: "4", isCorrect: true, count: 0, proximity: 1 },
-          { text: "2", isCorrect: false, count: 0, proximity: 0.5 },
-          { text: "6", isCorrect: false, count: 0, proximity: 0.2 },
-          { text: "8", isCorrect: false, count: 0, proximity: 0.1 },
-          { text: "10", isCorrect: false, count: 0, proximity: 0.05 },
-          { text: "12", isCorrect: false, count: 0, proximity: 0.01 },
-          { text: "14", isCorrect: false, count: 0, proximity: 0.005 },
-          { text: "16", isCorrect: false, count: 0, proximity: 0.001 },
-          { text: "18", isCorrect: false, count: 0, proximity: 0.0005 },
-          { text: "20", isCorrect: false, count: 0, proximity: 0.0001 },
-        ],
-      },
-      {
-        question: "What is the chemical symbol for water?",
-        answer: "H2O",
-        isResolve: false,
-        answers: [
-          { text: "H2O", isCorrect: true, count: 0, proximity: 1 },
-          { text: "H2S", isCorrect: false, count: 0, proximity: 0.5 },
-          { text: "CO2", isCorrect: false, count: 0, proximity: 0.2 },
-          { text: "O2", isCorrect: false, count: 0, proximity: 0.1 },
-          { text: "N2", isCorrect: false, count: 0, proximity: 0.05 },
-          { text: "He", isCorrect: false, count: 0, proximity: 0.01 },
-          { text: "Ne", isCorrect: false, count: 0, proximity: 0.005 },
-          { text: "Ar", isCorrect: false, count: 0, proximity: 0.001 },
-          { text: "Kr", isCorrect: false, count: 0, proximity: 0.0005 },
-          { text: "Xe", isCorrect: false, count: 0, proximity: 0.0001 },
-        ],
-      },
-      {
-        question: "Who wrote '1984'?",
-        answer: "George Orwell",
-        isResolve: true,
-        answers: [
-          { text: "George Orwell", isCorrect: true, count: 0, proximity: 1 },
-          { text: "Aldous Huxley", isCorrect: false, count: 0, proximity: 0.5 },
-          { text: "Ray Bradbury", isCorrect: false, count: 0, proximity: 0.2 },
-          {
-            text: "Fahrenheit 451",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.1,
-          },
-          {
-            text: "Joseph Heller",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.05,
-          },
-          {
-            text: "Kurt Vonnegut",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.01,
-          },
-          {
-            text: "Isaac Asimov",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.005,
-          },
-          {
-            text: "Arthur C. Clarke",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.001,
-          },
-          {
-            text: "Robert A. Heinlein",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.0005,
-          },
-          {
-            text: "Philip K. Dick",
-            isCorrect: false,
-            count: 0,
-            proximity: 0.0001,
-          },
-        ],
-      },
-    ],
-  },
-];
+const data: KnowledgeSets = [];
 
 export { data };
 
@@ -564,7 +945,7 @@ import useUserStore from "../store";
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_BACKEND_URI,
-  timeout: 1000,
+  timeout: 10000,
   headers: { "X-Custom-Header": "foobar" },
 });
 
@@ -610,6 +991,7 @@ const PATH = {
   signup: "/api/user/signup",
   login: "/api/user/login",
   knowledgeAdd: "/api/knowledge-set/add",
+  activeSessions: "/api/game/sessions/active",
   knowledgeSets: "/api/knowledge-set",
 };
 
@@ -617,6 +999,7 @@ const setToken = (token: string) => {
   const userStore = useUserStore.getState(); // Utiliser le store directement
   userStore.setToken(token);
   localStorage.setItem("access_token", token);
+  console.log("Token set:", token);
 };
 
 const signup = async ({
@@ -666,6 +1049,7 @@ const addKnowledgeSet = async (KnowledgeSet: any) => {
     const response = await api.post(PATH.knowledgeAdd, {
       ...KnowledgeSet,
     });
+    console.log("Knowledge set added:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to add knowledge set:", error);
@@ -676,6 +1060,7 @@ const addKnowledgeSet = async (KnowledgeSet: any) => {
 const getUserKnowledgeSets = async () => {
   try {
     const response = await api.get(PATH.knowledgeSets);
+    console.log("Fetched user knowledge sets:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge sets:", error);
@@ -686,6 +1071,7 @@ const getUserKnowledgeSets = async () => {
 const getKnowledgeSetById = async (id: string) => {
   try {
     const response = await api.get(`${PATH.knowledgeSets}/${id}`);
+    console.log("Fetched knowledge set by id:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge set:", error);
@@ -698,6 +1084,7 @@ const getQuestion = async (knowledgeId: string, id: string) => {
     const response = await api.get(
       `${PATH.knowledgeSets}/${knowledgeId}/${id}`
     );
+    console.log("Fetched question:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge set:", error);
@@ -705,12 +1092,25 @@ const getQuestion = async (knowledgeId: string, id: string) => {
   }
 };
 
+const getActiveSessions = async () => {
+  try {
+    const response = await api.get(`${PATH.activeSessions}`);
+    console.log("Fetched active sessions:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch active sessions:", error);
+    throw error;
+  }
+};
+
 export const useApi = () => {
   return {
     getKnowledgeSetById,
+    getQuestion,
     addKnowledgeSet,
     signup,
     login,
+    getActiveSessions,
     getUserKnowledgeSets,
   };
 };
@@ -724,6 +1124,170 @@ import { useLocation } from "react-router-dom";
 export const useQuery = (): { Q: string } => {
   return new URLSearchParams(useLocation().search) as any;
 };
+
+
+---------
+/// memory-app/src/hooks/useRealTimeGame.ts
+
+import { useState, useEffect, useCallback } from "react";
+import { io, Socket } from "socket.io-client";
+import useGameStore from "../store/gameStore";
+
+const SOCKET_SERVER_URL =
+  process.env.REACT_APP_SOCKET_SERVER_URL || "http://localhost:8000";
+
+interface UseRealTimeGameReturn {
+  gameTimer: number;
+  questionTimer: number;
+  handleAnswer: (answer: string) => void;
+  handleNextQuestion: () => void;
+}
+
+const useRealTimeGame = (
+  knowledgeSetId: string,
+  sessionId?: string
+): UseRealTimeGameReturn => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const {
+    setCurrentQuestion,
+    setQuestionTimer,
+    setFeedback,
+    setShowNextButton,
+    setCorrectAnswer,
+    setCurrentQuestionIndex,
+    setTotalQuestions,
+    questionTimer,
+    gameTimer,
+    setGameTimer,
+  } = useGameStore();
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const newSocket = io(SOCKET_SERVER_URL, {
+      auth: {
+        token: token,
+      },
+    });
+    setSocket(newSocket);
+
+    newSocket.on("connect_error", (err) => {
+      console.error("Socket connection error:", err.message);
+    });
+
+    if (sessionId) {
+      newSocket.emit("resumeGame", sessionId);
+    } else {
+      newSocket.emit("startGame", knowledgeSetId);
+    }
+
+    newSocket.on("newQuestion", (questionData: any) => {
+      console.log("Received newQuestion:", questionData);
+      setCurrentQuestion({
+        _id: questionData._id,
+        question: questionData.question,
+        answers: questionData.answers,
+        answer: "",
+        isResolve: false,
+      });
+      setFeedback("");
+      setShowNextButton(false);
+
+      setCurrentQuestionIndex(questionData.currentQuestionIndex);
+      setTotalQuestions(questionData.totalQuestions);
+
+      const { timeRemaining } = questionData;
+      setQuestionTimer(timeRemaining);
+    });
+
+    newSocket.on("feedback", (result: any) => {
+      console.log("Received feedback:", result);
+      if (result.timeUp) {
+        setFeedback(
+          "Temps écoulé ! La bonne réponse était : " + result.correctAnswer
+        );
+      } else {
+        setFeedback(
+          result.correct
+            ? "Correct !"
+            : `Incorrect. La bonne réponse était : ${result.correctAnswer}`
+        );
+      }
+      setCorrectAnswer(result.correctAnswer);
+      setShowNextButton(result.showNextButton);
+    });
+
+    newSocket.on("gameOver", (data: any) => {
+      console.log("Received gameOver:", data);
+      setFeedback("Partie terminée ! Votre score : " + data.score);
+      setGameTimer(0);
+    });
+
+    newSocket.on("error", (message: string) => {
+      console.error("Socket error:", message);
+      setFeedback("Erreur : " + message);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [
+    knowledgeSetId,
+    sessionId,
+    setCurrentQuestion,
+    setQuestionTimer,
+    setFeedback,
+    setShowNextButton,
+    setCurrentQuestionIndex,
+    setTotalQuestions,
+    setGameTimer,
+    setCorrectAnswer,
+  ]);
+
+  useEffect(() => {
+    if (questionTimer <= 0) return;
+
+    const interval = setInterval(() => {
+      setQuestionTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [questionTimer, setQuestionTimer]);
+
+  useEffect(() => {
+    if (gameTimer <= 0) return;
+
+    const interval = setInterval(() => {
+      setGameTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameTimer, setGameTimer]);
+
+  const handleAnswer = useCallback(
+    (answer: string) => {
+      console.log("Submitting answer:", answer);
+      socket?.emit("submitAnswer", {
+        answer,
+      });
+    },
+    [socket]
+  );
+
+  const handleNextQuestion = useCallback(() => {
+    console.log("Requesting next question");
+    socket?.emit("nextQuestion");
+    setCorrectAnswer(null); // Réinitialise la bonne réponse
+  }, [socket, setCorrectAnswer]);
+
+  return {
+    gameTimer,
+    questionTimer,
+    handleAnswer,
+    handleNextQuestion,
+  };
+};
+
+export default useRealTimeGame;
 
 
 ---------
@@ -789,7 +1353,7 @@ export const Card = () => {
           <Text pt={4} fontWeight={800} fontSize="2xl" textAlign={"center"}>
             {card?.name}
           </Text>
-          <ModeButtons cardId={card?._id || null} />
+          <ModeButtons cardId={id || null} />
         </Stack>
       </Stack>
     </>
@@ -800,66 +1364,112 @@ export const Card = () => {
 ---------
 /// memory-app/src/pages/GameModes.tsx
 
-import { Text, Flex, Stack } from "@chakra-ui/react";
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Text, Flex, Stack, Progress, Button } from "@chakra-ui/react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "../components/Header";
 import { Quiz } from "../components/Quiz";
+import RealTimeGame from "../components/RealTimeGame";
 import { useApi } from "../hooks/useApi";
-import { MemoryCardType } from "../Types";
+import useGameStore from "../store/gameStore";
+import { KnowledgeSet } from "../Types";
 
 export const GameModes = () => {
   const { gameMode = "Quiz", id = "0" } = useParams<{
     gameMode: string;
     id: string;
   }>();
-  const [knowledgeSet, setKnowledgeSet] = useState<MemoryCardType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const sessionId = new URLSearchParams(location.search).get("sessionId");
+  const {
+    gameTimer,
+    feedback,
+    setGameTimer,
+    setQuestions,
+    currentQuestionIndex,
+    totalQuestions,
+    questions,
+  } = useGameStore();
   const { getKnowledgeSetById } = useApi();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [knowledgeSet, setKnowledgeSet] = useState<KnowledgeSet | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        const data = await getKnowledgeSetById(id);
-        setKnowledgeSet(data?.data);
-        setError(null);
+        console.log("Fetching knowledge set with id:", id);
+        setIsLoading(true);
+        const response = await getKnowledgeSetById(id);
+        const data = response.data as KnowledgeSet;
+        if (data && data.cards && data.cards.length > 0) {
+          setKnowledgeSet(data);
+          setQuestions(data.cards);
+          setGameTimer(data.timeLimit || 300); // Utilise le temps total spécifique
+        } else {
+          setError("No questions found in this knowledge set.");
+        }
       } catch (err) {
-        setError("Failed to load knowledge set.");
+        console.error("Failed to load knowledge set:", err);
+        setError("Failed to load questions. Please try again.");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     fetchData();
-  }, [id, getKnowledgeSetById]);
+  }, [id, getKnowledgeSetById, setQuestions, setGameTimer]);
 
-  if (loading) return <Text>Loading...</Text>;
-  if (error) return <Text>{error}</Text>;
+  const handleEndGame = () => {
+    // Ici, vous pouvez ajouter la logique pour sauvegarder les résultats du jeu si nécessaire
+    navigate("/"); // Retourne à la page d'accueil
+  };
+
+  if (isLoading) return <Text>Loading...</Text>;
+  if (error) return <Text color="red.500">{error}</Text>;
 
   return (
-    <Stack>
+    <Stack spacing={4}>
       <Header hiddenButton={true} />
-      <Flex py={10} justify={"space-between"}>
-        <Text pr={20}>{gameMode}</Text>
-        <Text>10s</Text>
+      <Flex justify="space-between" align="center">
+        <Text fontSize="2xl" fontWeight="bold">
+          {knowledgeSet?.name}
+        </Text>
+        <Text>
+          Temps de jeu : {Math.floor(gameTimer / 60)}:
+          {(gameTimer % 60).toString().padStart(2, "0")}
+        </Text>
       </Flex>
+      <Progress value={(gameTimer / (knowledgeSet?.timeLimit || 300)) * 100} />
 
-      {gameMode === "Quiz" && knowledgeSet && (
-        <Quiz currentQuestion={knowledgeSet} />
+      {gameMode === "Quiz" && (
+        <Quiz knowledgeSetId={id} sessionId={sessionId} />
       )}
-      {/* Add conditions for other game modes if needed */}
+      {gameMode === "RealTime" && (
+        <RealTimeGame knowledgeSetId={id} sessionId={sessionId} />
+      )}
+
+      <Text mt={4}>{feedback}</Text>
+
+      <Flex justify="space-between">
+        <Text>
+          Question {currentQuestionIndex + 1} sur {totalQuestions}
+        </Text>
+        <Button onClick={handleEndGame} colorScheme="red">
+          Terminer la partie
+        </Button>
+      </Flex>
     </Stack>
   );
 };
+
+export default GameModes;
 
 
 ---------
 /// memory-app/src/pages/HomePage.tsx
 
-import * as React from "react";
-import { useEffect, useState, useCallback } from "react";
-
+import React, { useEffect, useState } from "react";
 import {
   Stack,
   Divider,
@@ -869,29 +1479,48 @@ import {
   TabPanels,
   TabPanel,
   Input,
+  Box,
+  Text,
+  Button,
 } from "@chakra-ui/react";
-
+import { useNavigate } from "react-router-dom";
 import { Header } from "../components/Header";
 import { ModalAddKnowledgeSet } from "../components/modals/addData";
 import { MemoryCardsList } from "../components/MemoryCardsList";
 import { ModeButtons } from "../components/ModeButtons";
-
-import type { KnowledgeSets } from "../Types";
 import { useApi } from "../hooks/useApi";
+
+interface ActiveSession {
+  gameStateId: string;
+  knowledgeSetId: string;
+  knowledgeSetName: string;
+  currentQuestionIndex: number;
+  score: number;
+  startTime: string;
+}
 
 const HomePage = () => {
   const [openModal, setOpenModal] = useState<(() => void) | null>(null);
-  const [memoryCards, setMemoryCards] = useState<KnowledgeSets>([]);
-  const { getUserKnowledgeSets } = useApi();
+  const [memoryCards, setMemoryCards] = useState([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const { getUserKnowledgeSets, getActiveSessions } = useApi();
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchData() {
-      const knowledgeSets = await getUserKnowledgeSets(); // Appel à l'API
-      setMemoryCards(knowledgeSets.data); // Mise à jour de l'état avec les données récupérées
+      const knowledgeSets = await getUserKnowledgeSets();
+      setMemoryCards(knowledgeSets.data);
+
+      const sessions = await getActiveSessions();
+      setActiveSessions(sessions.data);
     }
 
     fetchData();
-  }, []);
+  }, [getUserKnowledgeSets, getActiveSessions]);
+
+  const resumeSession = (sessionId: string, knowledgeSetId: string) => {
+    navigate(`/card/${knowledgeSetId}/Quiz?sessionId=${sessionId}`);
+  };
 
   return (
     <>
@@ -902,7 +1531,8 @@ const HomePage = () => {
         <Tabs>
           <TabList>
             <Tab>Mode</Tab>
-            <Tab>Mes Carts</Tab>
+            <Tab>Mes Cartes</Tab>
+            <Tab>Sessions Actives</Tab>
           </TabList>
           <TabPanels>
             <TabPanel>
@@ -911,6 +1541,28 @@ const HomePage = () => {
             <TabPanel>
               <Input borderRadius={40} placeholder="Filtre" />
               <MemoryCardsList memoryCards={memoryCards} />
+            </TabPanel>
+            <TabPanel>
+              {activeSessions.map((session) => (
+                <Box
+                  key={session.gameStateId}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  p={4}
+                  mb={4}
+                >
+                  <Text fontWeight="bold">{session.knowledgeSetName}</Text>
+                  <Text>Question: {session.currentQuestionIndex + 1}</Text>
+                  <Text>Score: {session.score}</Text>
+                  <Button
+                    onClick={() =>
+                      resumeSession(session.gameStateId, session.knowledgeSetId)
+                    }
+                  >
+                    Reprendre
+                  </Button>
+                </Box>
+              ))}
             </TabPanel>
           </TabPanels>
         </Tabs>
@@ -1261,6 +1913,105 @@ export function unregister() {
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import "@testing-library/jest-dom"
+
+
+---------
+/// memory-app/src/store/gameStore.ts
+
+import { create } from "zustand";
+import { MemoryCardType } from "../Types";
+
+interface GameState {
+  currentQuestion: MemoryCardType | null;
+  questions: MemoryCardType[];
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  gameTimer: number;
+  questionTimer: number;
+  feedback: string;
+  showNextButton: boolean;
+  correctAnswer: string | null;
+  setCurrentQuestion: (question: MemoryCardType) => void;
+  setGameTimer: (timer: number | ((prev: number) => number)) => void;
+  setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
+  setFeedback: (feedback: string) => void;
+  setShowNextButton: (show: boolean) => void;
+  setCorrectAnswer: (answer: string | null) => void;
+  setCurrentQuestionIndex: (index: number) => void;
+  setTotalQuestions: (total: number) => void;
+  nextQuestion: () => void;
+  setQuestions: (questions: MemoryCardType[]) => void;
+}
+
+const useGameStore = create<GameState>((set) => ({
+  currentQuestion: null,
+  questions: [],
+  currentQuestionIndex: 0,
+  totalQuestions: 0,
+  gameTimer: 300,
+  questionTimer: 10,
+  feedback: "",
+  showNextButton: false,
+  correctAnswer: null,
+  setCurrentQuestion: (question) => {
+    console.log("Setting currentQuestion:", question);
+    set({ currentQuestion: question });
+  },
+  setGameTimer: (timer) =>
+    set((state) => {
+      const newTimer =
+        typeof timer === "function" ? timer(state.gameTimer) : timer;
+      console.log("Setting gameTimer:", newTimer);
+      return { gameTimer: newTimer };
+    }),
+  setQuestionTimer: (timer) =>
+    set((state) => {
+      const newTimer =
+        typeof timer === "function" ? timer(state.questionTimer) : timer;
+      console.log("Setting questionTimer:", newTimer);
+      return { questionTimer: newTimer };
+    }),
+  setFeedback: (feedback) => {
+    console.log("Setting feedback:", feedback);
+    set({ feedback });
+  },
+  setShowNextButton: (show) => {
+    console.log("Setting showNextButton:", show);
+    set({ showNextButton: show });
+  },
+  setCorrectAnswer: (answer) => {
+    console.log("Setting correctAnswer:", answer);
+    set({ correctAnswer: answer });
+  },
+  setCurrentQuestionIndex: (index) => {
+    console.log("Setting currentQuestionIndex:", index);
+    set({ currentQuestionIndex: index });
+  },
+  setTotalQuestions: (total) => {
+    console.log("Setting totalQuestions:", total);
+    set({ totalQuestions: total });
+  },
+  nextQuestion: () =>
+    set((state) => {
+      const nextIndex = state.currentQuestionIndex + 1;
+      if (nextIndex < state.questions.length) {
+        console.log("Moving to next question, index:", nextIndex);
+        return {
+          currentQuestionIndex: nextIndex,
+          currentQuestion: state.questions[nextIndex],
+          questionTimer: 10,
+          showNextButton: false,
+        };
+      }
+      return state;
+    }),
+  setQuestions: (questions) => {
+    console.log("Setting questions:", questions);
+    set({ questions, currentQuestion: questions[0] });
+  },
+}));
+
+export default useGameStore;
 
 
 ---------

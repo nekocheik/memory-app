@@ -3,7 +3,7 @@ import useUserStore from "../store";
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_BACKEND_URI,
-  timeout: 1000,
+  timeout: 10000,
   headers: { "X-Custom-Header": "foobar" },
 });
 
@@ -49,6 +49,7 @@ const PATH = {
   signup: "/api/user/signup",
   login: "/api/user/login",
   knowledgeAdd: "/api/knowledge-set/add",
+  activeSessions: "/api/game/sessions/active",
   knowledgeSets: "/api/knowledge-set",
 };
 
@@ -56,6 +57,7 @@ const setToken = (token: string) => {
   const userStore = useUserStore.getState(); // Utiliser le store directement
   userStore.setToken(token);
   localStorage.setItem("access_token", token);
+  console.log("Token set:", token);
 };
 
 const signup = async ({
@@ -105,6 +107,7 @@ const addKnowledgeSet = async (KnowledgeSet: any) => {
     const response = await api.post(PATH.knowledgeAdd, {
       ...KnowledgeSet,
     });
+    console.log("Knowledge set added:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to add knowledge set:", error);
@@ -115,6 +118,7 @@ const addKnowledgeSet = async (KnowledgeSet: any) => {
 const getUserKnowledgeSets = async () => {
   try {
     const response = await api.get(PATH.knowledgeSets);
+    console.log("Fetched user knowledge sets:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge sets:", error);
@@ -125,6 +129,7 @@ const getUserKnowledgeSets = async () => {
 const getKnowledgeSetById = async (id: string) => {
   try {
     const response = await api.get(`${PATH.knowledgeSets}/${id}`);
+    console.log("Fetched knowledge set by id:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge set:", error);
@@ -137,6 +142,7 @@ const getQuestion = async (knowledgeId: string, id: string) => {
     const response = await api.get(
       `${PATH.knowledgeSets}/${knowledgeId}/${id}`
     );
+    console.log("Fetched question:", response.data);
     return response.data;
   } catch (error) {
     console.error("Failed to fetch knowledge set:", error);
@@ -144,12 +150,25 @@ const getQuestion = async (knowledgeId: string, id: string) => {
   }
 };
 
+const getActiveSessions = async () => {
+  try {
+    const response = await api.get(`${PATH.activeSessions}`);
+    console.log("Fetched active sessions:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch active sessions:", error);
+    throw error;
+  }
+};
+
 export const useApi = () => {
   return {
     getKnowledgeSetById,
+    getQuestion,
     addKnowledgeSet,
     signup,
     login,
+    getActiveSessions,
     getUserKnowledgeSets,
   };
 };

@@ -4,6 +4,7 @@ import type { GameMode } from "../Types/index";
 
 export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
   function selectMode(mode: GameMode) {
+    console.log({ cardId });
     const newPath = `/card/${cardId}/${mode}`;
     window.location.href = newPath;
   }

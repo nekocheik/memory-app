@@ -25,7 +25,7 @@ export const Card = () => {
           <Text pt={4} fontWeight={800} fontSize="2xl" textAlign={"center"}>
             {card?.name}
           </Text>
-          <ModeButtons cardId={card?._id || null} />
+          <ModeButtons cardId={id || null} />
         </Stack>
       </Stack>
     </>
