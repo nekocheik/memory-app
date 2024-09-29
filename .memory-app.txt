@@ -15,7 +15,7 @@ test("renders learn react link", () => {
 ---------
 /// memory-app/src/App.tsx
 
-import * as React from "react";
+import React, { useEffect } from "react";
 import { ChakraProvider, Stack } from "@chakra-ui/react";
 import {
   BrowserRouter as Router,
@@ -29,42 +29,107 @@ import { GameModes } from "./pages/GameModes";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import useNotification from "./hooks/useNotification";
+import StatisticsPage from "./pages/StatisticsPage";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
+import RepetitionMode from "./components/RepetitionMode";
+import useUserStore from "./store";
+import SummaryPage from "./pages/SummaryPage"; // Importez la nouvelle page
 
 export const App = () => {
+  const { showNotification } = useNotification();
+  const setToken = useUserStore((state) => state.setToken);
+
+  useEffect(() => {
+    // Initialiser le token à partir du localStorage
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      setToken(token);
+    }
+
+    let inactivityTimeout: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimeout);
+      inactivityTimeout = setTimeout(() => {
+        showNotification("Revenez vite !", {
+          body: "Vous avez des cartes à réviser.",
+        });
+      }, 1000 * 60 * 60 * 24); // 24 heures d'inactivité
+    };
+
+    window.addEventListener("mousemove", resetTimer);
+    window.addEventListener("keypress", resetTimer);
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimeout);
+      window.removeEventListener("mousemove", resetTimer);
+      window.removeEventListener("keypress", resetTimer);
+    };
+  }, [showNotification, setToken]);
+
   return (
-    <ChakraProvider>
-      <Stack mx={3}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/memory-card/:id"
-            element={
-              <ProtectedRoute>
-                <Card />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/card/:id/:gameMode"
-            element={
-              <ProtectedRoute>
-                <GameModes />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<div>404 - Page not found</div>} />
-        </Routes>
-      </Stack>
-    </ChakraProvider>
+    <ThemeSwitcher>
+      <ChakraProvider>
+        <Stack mx={3}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/memory-card/:id"
+              element={
+                <ProtectedRoute>
+                  <Card />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/card/:id/:gameMode"
+              element={
+                <ProtectedRoute>
+                  <GameModes />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<div>404 - Page not found</div>} />
+            <Route
+              path="/statistics"
+              element={
+                <ProtectedRoute>
+                  <StatisticsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/summary"
+              element={
+                <ProtectedRoute>
+                  <SummaryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/card/:id/Repetition"
+              element={
+                <ProtectedRoute>
+                  <RepetitionMode />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Stack>
+      </ChakraProvider>
+    </ThemeSwitcher>
   );
 };
 
@@ -167,6 +232,70 @@ export type GameMode = "Quiz" | "Repetition" | "FollowUp";
 
 
 ---------
+/// memory-app/src/components/FeedbackModal.tsx
+
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Textarea,
+  Button,
+} from "@chakra-ui/react";
+import { useState } from "react";
+import { useApi } from "../hooks/useApi";
+
+interface FeedbackModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cardId: string;
+}
+
+export const FeedbackModal: React.FC<FeedbackModalProps> = ({
+  isOpen,
+  onClose,
+  cardId,
+}) => {
+  const [feedback, setFeedback] = useState("");
+  const { sendFeedback } = useApi();
+
+  const handleSubmit = async () => {
+    await sendFeedback(cardId, feedback);
+    setFeedback("");
+    onClose();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Envoyer un Feedback</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <Textarea
+            placeholder="Votre feedback..."
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button onClick={handleSubmit} colorScheme="blue" mr={3}>
+            Envoyer
+          </Button>
+          <Button onClick={onClose}>Annuler</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+};
+
+export default FeedbackModal;
+
+
+---------
 /// memory-app/src/components/GameMode/Card.tsx
 
 import { CardBody, Card, Text } from "@chakra-ui/react";
@@ -200,7 +329,7 @@ export default MCard;
 import * as React from "react";
 
 //import { PlusSquareIcon } from "@chakra-ui/icons";
-
+import { Link } from "react-router-dom";
 import { Flex, Text, Spacer, Button } from "@chakra-ui/react";
 
 export const Header = ({
@@ -215,6 +344,9 @@ export const Header = ({
       |MEMORY-CARD|
     </Text>
     <Spacer />
+    <Link to="/statistics">
+      <Button>Statistiques</Button>
+    </Link>
     {!hiddenButton ? <Button onClick={openModal}>Ajouter</Button> : ""}
   </Flex>
 );
@@ -253,46 +385,30 @@ export const MemoryCardsList = ({
 ---------
 /// memory-app/src/components/ModeButtons.tsx
 
-import { SimpleGrid, Button } from "@chakra-ui/react";
+import { HStack, Button } from "@chakra-ui/react";
+import { Link } from "react-router-dom";
 
-import type { GameMode } from "../Types/index";
+interface ModeButtonsProps {
+  cardId?: string | null;
+}
 
-export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
-  function selectMode(mode: GameMode) {
-    console.log({ cardId });
-    const newPath = `/card/${cardId}/${mode}`;
-    window.location.href = newPath;
-  }
-
+export const ModeButtons: React.FC<ModeButtonsProps> = ({ cardId = "0" }) => {
   return (
-    <SimpleGrid spacing={4}>
-      <Button
-        onClick={() => selectMode("Quiz")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        QUIZ
-      </Button>
-      <Button
-        onClick={() => selectMode("Repetition")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        REPETITION
-      </Button>
-      <Button
-        onClick={() => selectMode("FollowUp")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        SUIVI
-      </Button>
-    </SimpleGrid>
+    <HStack spacing={4}>
+      <Link to={`/card/${cardId}/Quiz`}>
+        <Button colorScheme="blue">Quiz</Button>
+      </Link>
+      <Link to={`/card/${cardId}/RealTime`}>
+        <Button colorScheme="green">Temps Réel</Button>
+      </Link>
+      <Link to={`/card/${cardId}/Repetition`}>
+        <Button colorScheme="purple">Répétition</Button>
+      </Link>
+    </HStack>
   );
 };
+
+export default ModeButtons;
 
 
 ---------
@@ -300,14 +416,13 @@ export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
 
 import React from "react";
 import { Navigate } from "react-router-dom";
+import useUserStore from "../store";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const token = localStorage.getItem("access_token");
-
-  console.log(token);
+  const token = useUserStore((state) => state.token);
 
   if (!token) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;
@@ -321,9 +436,12 @@ export default ProtectedRoute;
 
 import React, { useState, useEffect } from "react";
 import { Stack, Text, Button, VStack, Box } from "@chakra-ui/react";
-import { MCard } from "./GameMode/Card";
+import { MCard } from "../components/GameMode/Card";
 import useGameStore from "../store/gameStore";
 import useRealTimeGame from "../hooks/useRealTimeGame";
+import useProgressStore from "../store/progressStore";
+import { useNavigate } from "react-router-dom";
+import { useApi } from "../hooks/useApi";
 
 interface QuizProps {
   knowledgeSetId: string;
@@ -339,15 +457,64 @@ export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
     currentQuestionIndex,
     totalQuestions,
   } = useGameStore();
-  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
-    useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const {
+    gameTimer,
+    questionTimer,
+    handleAnswer,
+    handleNextQuestion,
+    gameStateId,
+  } = useRealTimeGame(knowledgeSetId, sessionId || undefined);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+  const { incrementScore, addBadge, correctAnswers, recordPerformance } =
+    useProgressStore();
+  const navigate = useNavigate();
+  const { sendFeedback } = useApi(); // Utiliser useApi pour envoyer des feedbacks
 
-  // Vérifier la valeur de correctAnswer
+  // Navigation vers la page de résumé lorsque le quiz est terminé
   useEffect(() => {
-    console.log("Correct Answer:", correctAnswer);
-  }, [correctAnswer]);
+    if (feedback.startsWith("Partie terminée !")) {
+      if (gameStateId) {
+        navigate(`/summary?gameStateId=${gameStateId}`);
+      } else {
+        console.error("gameStateId is null or undefined");
+        // Optionnellement, afficher un message d'erreur ou rediriger ailleurs
+      }
+    }
+  }, [feedback, navigate, gameStateId]);
+
+  // Enregistrer la performance après avoir reçu le feedback
+  useEffect(() => {
+    if (feedback && currentQuestion && !isAnswered) {
+      const isCorrect = feedback.includes("Correct");
+      if (isCorrect) {
+        incrementScore();
+        // Débloquer un badge tous les 5 bonnes réponses
+        if ((correctAnswers + 1) % 5 === 0) {
+          addBadge(`Badge ${Math.floor((correctAnswers + 1) / 5)}`);
+        }
+      }
+      console.log("Recording performance for question:", currentQuestion._id);
+      recordPerformance(currentQuestion._id.toString(), isCorrect);
+
+      // Envoyer un feedback au backend
+      sendFeedback(
+        currentQuestion._id.toString(),
+        isCorrect ? "Correct" : "Incorrect"
+      ).catch((error) => {
+        console.error("Erreur lors de l'envoi du feedback:", error);
+      });
+
+      // Marquer la question comme traitée
+      setIsAnswered(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedback, currentQuestion]);
+
+  // Réinitialiser le drapeau lorsque la question change
+  useEffect(() => {
+    setIsAnswered(false);
+  }, [currentQuestion]);
 
   if (!currentQuestion) {
     return <Text>Chargement de la question...</Text>;
@@ -356,7 +523,6 @@ export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
   const onAnswerClick = (answer: string) => {
     if (isAnswered) return;
     setSelectedAnswer(answer);
-    setIsAnswered(true);
     handleAnswer(answer);
   };
 
@@ -368,7 +534,7 @@ export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
   };
 
   return (
-    <VStack spacing={4}>
+    <VStack spacing={4} align="stretch">
       <MCard text={currentQuestion.question} />
       <Text>
         Temps de jeu : {Math.floor(gameTimer / 60)}:
@@ -380,7 +546,7 @@ export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
       <Text>
         Question {currentQuestionIndex + 1} sur {totalQuestions}
       </Text>
-      <Stack width="100%">
+      <Stack width="100%" spacing={2}>
         {currentQuestion.answers.map((answer, index) => (
           <Button
             key={index}
@@ -499,6 +665,278 @@ export default RealTimeGame;
 
 
 ---------
+/// memory-app/src/components/RepetitionChoiceMode.tsx
+
+import React, { useEffect, useState } from "react";
+import { VStack, Text, Button, Stack } from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+
+interface RepetitionChoiceModeProps {
+  knowledgeSetId: string;
+}
+
+const RepetitionChoiceMode: React.FC<RepetitionChoiceModeProps> = ({
+  knowledgeSetId,
+}) => {
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const { getKnowledgeSetById } = useApi();
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      const response = await getKnowledgeSetById(knowledgeSetId);
+      const data = response.data;
+      if (data && data.cards) {
+        setQuestions(data.cards);
+      }
+    };
+    fetchQuestions();
+  }, [knowledgeSetId, getKnowledgeSetById]);
+
+  if (questions.length === 0) {
+    return <Text>Chargement des questions...</Text>;
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const onAnswerClick = (answer: string) => {
+    if (isAnswered) return;
+    setSelectedAnswer(answer);
+    setIsAnswered(true);
+    const isCorrect = currentQuestion.answers.some(
+      (a: any) => a.text === answer && a.isCorrect
+    );
+    setFeedback(isCorrect ? "Correct!" : "Incorrect.");
+  };
+
+  const onNextClick = () => {
+    if (currentQuestionIndex + 1 < questions.length) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setIsAnswered(false);
+      setFeedback("");
+      setSelectedAnswer(null);
+    } else {
+      // Fin des questions
+      setFeedback("Vous avez terminé toutes les questions!");
+    }
+  };
+
+  return (
+    <VStack spacing={4}>
+      <Text fontSize="xl">{currentQuestion.question}</Text>
+      <Stack width="100%">
+        {currentQuestion.answers.map((answer: any, index: number) => (
+          <Button
+            key={index}
+            onClick={() => onAnswerClick(answer.text)}
+            colorScheme={
+              isAnswered
+                ? answer.isCorrect
+                  ? "green"
+                  : selectedAnswer === answer.text
+                  ? "red"
+                  : "gray"
+                : "blue"
+            }
+            disabled={isAnswered}
+            width="100%"
+          >
+            {answer.text}
+          </Button>
+        ))}
+      </Stack>
+      {feedback && (
+        <>
+          <Text>{feedback}</Text>
+          <Button onClick={onNextClick}>Question Suivante</Button>
+        </>
+      )}
+    </VStack>
+  );
+};
+
+export default RepetitionChoiceMode;
+
+
+---------
+/// memory-app/src/components/RepetitionMode.tsx
+
+import React, { useState } from "react";
+import { Button, VStack, Text } from "@chakra-ui/react";
+import RepetitionChoiceMode from "./RepetitionChoiceMode";
+import RepetitionTextInputMode from "./RepetitionTextInputMode";
+import { useParams } from "react-router-dom";
+
+const RepetitionMode: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [mode, setMode] = useState<"choice" | "textInput" | null>(null);
+
+  if (mode === "choice") {
+    return <RepetitionChoiceMode knowledgeSetId={id!} />;
+  }
+
+  if (mode === "textInput") {
+    return <RepetitionTextInputMode knowledgeSetId={id!} />;
+  }
+
+  return (
+    <VStack spacing={4}>
+      <Text fontSize="2xl" fontWeight="bold">
+        Choisissez le mode de répétition
+      </Text>
+      <Button onClick={() => setMode("choice")} colorScheme="blue">
+        Mode Choix
+      </Button>
+      <Button onClick={() => setMode("textInput")} colorScheme="green">
+        Mode Saisie de Texte
+      </Button>
+    </VStack>
+  );
+};
+
+export default RepetitionMode;
+
+
+---------
+/// memory-app/src/components/RepetitionTextInputMode.tsx
+
+import React, { useEffect, useState } from "react";
+import { VStack, Text, Button, Input } from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+
+interface RepetitionTextInputModeProps {
+  knowledgeSetId: string;
+}
+
+const RepetitionTextInputMode: React.FC<RepetitionTextInputModeProps> = ({
+  knowledgeSetId,
+}) => {
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [userAnswer, setUserAnswer] = useState("");
+  const { getKnowledgeSetById } = useApi();
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      const response = await getKnowledgeSetById(knowledgeSetId);
+      const data = response.data;
+      if (data && data.cards) {
+        setQuestions(data.cards);
+      }
+    };
+    fetchQuestions();
+  }, [knowledgeSetId, getKnowledgeSetById]);
+
+  if (questions.length === 0) {
+    return <Text>Chargement des questions...</Text>;
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const onSubmit = () => {
+    if (isAnswered) return;
+    setIsAnswered(true);
+    const correctAnswers = currentQuestion.answers
+      .filter((a: any) => a.isCorrect)
+      .map((a: any) => a.text.toLowerCase());
+    const isCorrect = correctAnswers.includes(userAnswer.trim().toLowerCase());
+    setFeedback(
+      isCorrect
+        ? "Correct!"
+        : `Incorrect. La bonne réponse était: ${correctAnswers.join(", ")}`
+    );
+  };
+
+  const onNextClick = () => {
+    if (currentQuestionIndex + 1 < questions.length) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setIsAnswered(false);
+      setFeedback("");
+      setUserAnswer("");
+    } else {
+      // Fin des questions
+      setFeedback("Vous avez terminé toutes les questions!");
+    }
+  };
+
+  return (
+    <VStack spacing={4}>
+      <Text fontSize="xl">{currentQuestion.question}</Text>
+      <Input
+        placeholder="Votre réponse"
+        value={userAnswer}
+        onChange={(e) => setUserAnswer(e.target.value)}
+        isDisabled={isAnswered}
+      />
+      {!isAnswered && (
+        <Button onClick={onSubmit} colorScheme="blue">
+          Soumettre
+        </Button>
+      )}
+      {feedback && (
+        <>
+          <Text>{feedback}</Text>
+          <Button onClick={onNextClick}>Question Suivante</Button>
+        </>
+      )}
+    </VStack>
+  );
+};
+
+export default RepetitionTextInputMode;
+
+
+---------
+/// memory-app/src/components/ThemeSwitcher.tsx
+
+import { Box, Select } from "@chakra-ui/react";
+import { useState } from "react";
+import { extendTheme, ChakraProvider } from "@chakra-ui/react";
+
+const themes = {
+  light: extendTheme({
+    config: {
+      initialColorMode: "light",
+    },
+  }),
+  dark: extendTheme({
+    config: {
+      initialColorMode: "dark",
+    },
+  }),
+};
+
+type ThemeName = "light" | "dark";
+
+export const ThemeSwitcher = ({ children }: { children: React.ReactNode }) => {
+  const [themeName, setThemeName] = useState<ThemeName>("dark");
+  const theme = themes[themeName];
+
+  return (
+    <ChakraProvider theme={theme}>
+      <Box>
+        <Select
+          value={themeName}
+          onChange={(e) => setThemeName(e.target.value as ThemeName)}
+        >
+          <option value="light">Clair</option>
+          <option value="dark">Sombre</option>
+        </Select>
+      </Box>
+      {children}
+    </ChakraProvider>
+  );
+};
+
+export default ThemeSwitcher;
+
+
+---------
 /// memory-app/src/components/Types.d.tsx
 
 export {};
@@ -576,9 +1014,10 @@ export function ModalAddKnowledgeSet({
   const [jsonInput, setJsonInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+
   useEffect(() => {
-    openModal(onOpen);
-  }, [openModal, onOpen]);
+    openModal(() => onOpen);
+  }, []);
 
   // Synchroniser les données lorsque le mode change
   useEffect(() => {
@@ -943,36 +1382,14 @@ export { data };
 import axios from "axios";
 import useUserStore from "../store";
 
+// Créez une instance Axios avec la configuration de base
 const api = axios.create({
-  baseURL: process.env.REACT_APP_BACKEND_URI,
+  baseURL: process.env.REACT_APP_BACKEND_URI || "http://localhost:8000",
   timeout: 10000,
   headers: { "X-Custom-Header": "foobar" },
 });
 
-api.interceptors.request.use(
-  (config) => {
-    console.log("Request made to:", config.url);
-    console.log("Request data:", config.data);
-    return config;
-  },
-  (error) => {
-    console.error("Error in request:", error);
-    return Promise.reject(error);
-  }
-);
-
-api.interceptors.response.use(
-  (response) => {
-    console.log("Response received from:", response.config.url);
-    console.log("Response data:", response.data);
-    return response;
-  },
-  (error) => {
-    console.error("Error in response:", error.response?.data || error.message);
-    return Promise.reject(error);
-  }
-);
-
+// Intercepteur de requête pour ajouter le token d'authentification
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
@@ -987,14 +1404,40 @@ api.interceptors.request.use(
   }
 );
 
+// Intercepteur de réponse pour gérer les erreurs 401
+api.interceptors.response.use(
+  (response) => {
+    console.log("Response received from:", response.config.url);
+    console.log("Response data:", response.data);
+    return response;
+  },
+  (error) => {
+    console.error("Error in response:", error.response?.data || error.message);
+
+    if (error.response && error.response.status === 401) {
+      // Déconnexion de l'utilisateur
+      useUserStore.getState().clearToken();
+      localStorage.removeItem("access_token");
+
+      // Redirection vers la page de connexion
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// Définissez vos chemins API
 const PATH = {
   signup: "/api/user/signup",
   login: "/api/user/login",
   knowledgeAdd: "/api/knowledge-set/add",
   activeSessions: "/api/game/sessions/active",
   knowledgeSets: "/api/knowledge-set",
+  gamePerformance: "/api/game/performance", // Ajouté pour récupérer les performances
 };
 
+// Fonction pour définir le token dans le store et le localStorage
 const setToken = (token: string) => {
   const userStore = useUserStore.getState(); // Utiliser le store directement
   userStore.setToken(token);
@@ -1002,6 +1445,7 @@ const setToken = (token: string) => {
   console.log("Token set:", token);
 };
 
+// Fonction d'inscription
 const signup = async ({
   username,
   email,
@@ -1024,6 +1468,7 @@ const signup = async ({
   }
 };
 
+// Fonction de connexion
 const login = async ({
   username,
   password,
@@ -1044,6 +1489,7 @@ const login = async ({
   }
 };
 
+// Autres fonctions API...
 const addKnowledgeSet = async (KnowledgeSet: any) => {
   try {
     const response = await api.post(PATH.knowledgeAdd, {
@@ -1103,6 +1549,29 @@ const getActiveSessions = async () => {
   }
 };
 
+const sendFeedback = async (cardId: string, feedback: string) => {
+  try {
+    const response = await api.post("/api/feedback", { cardId, feedback });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to send feedback:", error);
+    throw error;
+  }
+};
+
+// Nouvelle Fonction pour Récupérer les Données de Performance
+const getGamePerformance = async (gameStateId: string) => {
+  try {
+    const response = await api.get(`${PATH.gamePerformance}/${gameStateId}`);
+    console.log("Fetched game performance:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch game performance:", error);
+    throw error;
+  }
+};
+
+// Exportez vos fonctions via le hook useApi
 export const useApi = () => {
   return {
     getKnowledgeSetById,
@@ -1112,8 +1581,36 @@ export const useApi = () => {
     login,
     getActiveSessions,
     getUserKnowledgeSets,
+    sendFeedback,
+    getGamePerformance, // Exporté pour utiliser dans SummaryPage
   };
 };
+
+
+---------
+/// memory-app/src/hooks/useNotification.ts
+
+import { useEffect } from "react";
+
+const useNotification = () => {
+  useEffect(() => {
+    if ("Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  const showNotification = (title: string, options?: NotificationOptions) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, options);
+    }
+  };
+
+  return { showNotification };
+};
+
+export default useNotification;
 
 
 ---------
@@ -1129,161 +1626,96 @@ export const useQuery = (): { Q: string } => {
 ---------
 /// memory-app/src/hooks/useRealTimeGame.ts
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 import useGameStore from "../store/gameStore";
+import useUserStore from "../store";
+import useProgressStore from "../store/progressStore";
+import { useApi } from "./useApi";
 
-const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_SERVER_URL || "http://localhost:8000";
-
-interface UseRealTimeGameReturn {
-  gameTimer: number;
-  questionTimer: number;
-  handleAnswer: (answer: string) => void;
-  handleNextQuestion: () => void;
-}
-
-const useRealTimeGame = (
-  knowledgeSetId: string,
-  sessionId?: string
-): UseRealTimeGameReturn => {
-  const [socket, setSocket] = useState<Socket | null>(null);
+const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
   const {
     setCurrentQuestion,
-    setQuestionTimer,
     setFeedback,
-    setShowNextButton,
-    setCorrectAnswer,
-    setCurrentQuestionIndex,
     setTotalQuestions,
-    questionTimer,
-    gameTimer,
-    setGameTimer,
+    setCurrentQuestionIndex,
+    setGameStateId,
   } = useGameStore();
+  const { setTotalQuestions: setProgressTotalQuestions } = useProgressStore();
+  const { getGamePerformance } = useApi();
+  const userStore = useUserStore();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const newSocket = io(SOCKET_SERVER_URL, {
+    if (!userStore.token) return;
+
+    const socket: Socket = io("http://localhost:8000", {
       auth: {
-        token: token,
+        token: userStore.token,
       },
     });
-    setSocket(newSocket);
 
-    newSocket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message);
-    });
+    socket.on("connect", () => {
+      console.log("Connected to game socket");
 
-    if (sessionId) {
-      newSocket.emit("resumeGame", sessionId);
-    } else {
-      newSocket.emit("startGame", knowledgeSetId);
-    }
-
-    newSocket.on("newQuestion", (questionData: any) => {
-      console.log("Received newQuestion:", questionData);
-      setCurrentQuestion({
-        _id: questionData._id,
-        question: questionData.question,
-        answers: questionData.answers,
-        answer: "",
-        isResolve: false,
-      });
-      setFeedback("");
-      setShowNextButton(false);
-
-      setCurrentQuestionIndex(questionData.currentQuestionIndex);
-      setTotalQuestions(questionData.totalQuestions);
-
-      const { timeRemaining } = questionData;
-      setQuestionTimer(timeRemaining);
-    });
-
-    newSocket.on("feedback", (result: any) => {
-      console.log("Received feedback:", result);
-      if (result.timeUp) {
-        setFeedback(
-          "Temps écoulé ! La bonne réponse était : " + result.correctAnswer
-        );
+      if (sessionId) {
+        socket.emit("resumeGame", sessionId);
       } else {
-        setFeedback(
-          result.correct
-            ? "Correct !"
-            : `Incorrect. La bonne réponse était : ${result.correctAnswer}`
-        );
+        socket.emit("startGame", knowledgeSetId);
       }
-      setCorrectAnswer(result.correctAnswer);
-      setShowNextButton(result.showNextButton);
     });
 
-    newSocket.on("gameOver", (data: any) => {
-      console.log("Received gameOver:", data);
-      setFeedback("Partie terminée ! Votre score : " + data.score);
-      setGameTimer(0);
+    socket.on("newQuestion", (data) => {
+      console.log("Received newQuestion:", data);
+      setCurrentQuestion(data);
+      setCurrentQuestionIndex(data.currentQuestionIndex);
+      setTotalQuestions(data.totalQuestions);
+      setProgressTotalQuestions(data.totalQuestions);
+      setGameStateId(data.gameStateId || null); // Assurez-vous que gameStateId est transmis
     });
 
-    newSocket.on("error", (message: string) => {
-      console.error("Socket error:", message);
-      setFeedback("Erreur : " + message);
+    socket.on("feedback", (data) => {
+      console.log("Received feedback:", data);
+      setFeedback(data);
+    });
+
+    socket.on("gameOver", (data) => {
+      console.log("Game over:", data);
+      setFeedback(`Partie terminée ! Score: ${data.score}`);
+      // Vous pouvez éventuellement stocker le gameStateId ici si nécessaire
+    });
+
+    socket.on("error", (errorMessage: string) => {
+      console.error("Socket error:", errorMessage);
+      setFeedback(`Erreur: ${errorMessage}`);
     });
 
     return () => {
-      newSocket.disconnect();
+      socket.disconnect();
     };
   }, [
     knowledgeSetId,
     sessionId,
+    userStore.token,
     setCurrentQuestion,
-    setQuestionTimer,
     setFeedback,
-    setShowNextButton,
-    setCurrentQuestionIndex,
     setTotalQuestions,
-    setGameTimer,
-    setCorrectAnswer,
+    setCurrentQuestionIndex,
+    setGameStateId,
+    setProgressTotalQuestions,
   ]);
 
-  useEffect(() => {
-    if (questionTimer <= 0) return;
-
-    const interval = setInterval(() => {
-      setQuestionTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [questionTimer, setQuestionTimer]);
-
-  useEffect(() => {
-    if (gameTimer <= 0) return;
-
-    const interval = setInterval(() => {
-      setGameTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [gameTimer, setGameTimer]);
-
-  const handleAnswer = useCallback(
-    (answer: string) => {
-      console.log("Submitting answer:", answer);
-      socket?.emit("submitAnswer", {
-        answer,
-      });
-    },
-    [socket]
-  );
-
-  const handleNextQuestion = useCallback(() => {
-    console.log("Requesting next question");
-    socket?.emit("nextQuestion");
-    setCorrectAnswer(null); // Réinitialise la bonne réponse
-  }, [socket, setCorrectAnswer]);
+  const { gameStateId } = useGameStore();
 
   return {
-    gameTimer,
-    questionTimer,
-    handleAnswer,
-    handleNextQuestion,
+    gameTimer: 0, // Vous devriez implémenter le timer si nécessaire
+    questionTimer: 0, // Vous devriez implémenter le timer si nécessaire
+    handleAnswer: (answer: string) => {
+      // Implémenter la logique d'envoi de réponse via socket
+    },
+    handleNextQuestion: () => {
+      // Implémenter la logique de demande de la prochaine question via socket
+    },
+    gameStateId,
   };
 };
 
@@ -1295,14 +1727,21 @@ export default useRealTimeGame;
 
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom"; // Import BrowserRouter
+import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import reportWebVitals from "./reportWebVitals";
 import * as serviceWorker from "./serviceWorker";
+import useUserStore from "./store";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Failed to find the root element");
 const root = ReactDOM.createRoot(container);
+
+// Initialiser le token à partir du localStorage
+const token = localStorage.getItem("access_token");
+if (token) {
+  useUserStore.getState().setToken(token);
+}
 
 root.render(
   <React.StrictMode>
@@ -1312,14 +1751,8 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://cra.link/PWA
+// Reste de votre code...
 serviceWorker.unregister();
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
 
@@ -1365,7 +1798,7 @@ export const Card = () => {
 /// memory-app/src/pages/GameModes.tsx
 
 import React, { useEffect, useState } from "react";
-import { Text, Flex, Stack, Progress, Button } from "@chakra-ui/react";
+import { Text, Flex, Stack, Progress, Button, Box } from "@chakra-ui/react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "../components/Header";
 import { Quiz } from "../components/Quiz";
@@ -1373,6 +1806,7 @@ import RealTimeGame from "../components/RealTimeGame";
 import { useApi } from "../hooks/useApi";
 import useGameStore from "../store/gameStore";
 import { KnowledgeSet } from "../Types";
+import useProgressStore from "../store/progressStore";
 
 export const GameModes = () => {
   const { gameMode = "Quiz", id = "0" } = useParams<{
@@ -1396,6 +1830,9 @@ export const GameModes = () => {
   const [error, setError] = useState<string | null>(null);
   const [knowledgeSet, setKnowledgeSet] = useState<KnowledgeSet | null>(null);
 
+  const { score, correctAnswers, badges, setTotalQuestions } =
+    useProgressStore();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -1406,7 +1843,8 @@ export const GameModes = () => {
         if (data && data.cards && data.cards.length > 0) {
           setKnowledgeSet(data);
           setQuestions(data.cards);
-          setGameTimer(data.timeLimit || 300); // Utilise le temps total spécifique
+          setGameTimer(data.timeLimit || 300);
+          setTotalQuestions(data.cards.length);
         } else {
           setError("No questions found in this knowledge set.");
         }
@@ -1418,11 +1856,10 @@ export const GameModes = () => {
       }
     };
     fetchData();
-  }, [id, getKnowledgeSetById, setQuestions, setGameTimer]);
+  }, [id, getKnowledgeSetById, setQuestions, setGameTimer, setTotalQuestions]);
 
   const handleEndGame = () => {
-    // Ici, vous pouvez ajouter la logique pour sauvegarder les résultats du jeu si nécessaire
-    navigate("/"); // Retourne à la page d'accueil
+    navigate("/");
   };
 
   if (isLoading) return <Text>Loading...</Text>;
@@ -1459,6 +1896,13 @@ export const GameModes = () => {
           Terminer la partie
         </Button>
       </Flex>
+      <Box>
+        <Text>Score: {score}</Text>
+        <Text>
+          Progression: {correctAnswers} / {totalQuestions}
+        </Text>
+        <Text>Badges débloqués: {badges.join(", ")}</Text>
+      </Box>
     </Stack>
   );
 };
@@ -1503,6 +1947,7 @@ const HomePage = () => {
   const [openModal, setOpenModal] = useState<(() => void) | null>(null);
   const [memoryCards, setMemoryCards] = useState([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const { getUserKnowledgeSets, getActiveSessions } = useApi();
   const navigate = useNavigate();
 
@@ -1522,11 +1967,15 @@ const HomePage = () => {
     navigate(`/card/${knowledgeSetId}/Quiz?sessionId=${sessionId}`);
   };
 
+  const filteredMemoryCards = memoryCards.filter((card: any) =>
+    card.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <>
-      <ModalAddKnowledgeSet openModal={(fn) => setOpenModal(fn)} />
+      <ModalAddKnowledgeSet openModal={setOpenModal} />
       <Stack>
-        <Header openModal={openModal} />
+        <Header />
         <Divider mt={2} />
         <Tabs>
           <TabList>
@@ -1539,8 +1988,13 @@ const HomePage = () => {
               <ModeButtons />
             </TabPanel>
             <TabPanel>
-              <Input borderRadius={40} placeholder="Filtre" />
-              <MemoryCardsList memoryCards={memoryCards} />
+              <Input
+                borderRadius={40}
+                placeholder="Rechercher"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <MemoryCardsList memoryCards={filteredMemoryCards} />
             </TabPanel>
             <TabPanel>
               {activeSessions.map((session) => (
@@ -1726,6 +2180,177 @@ export const SignupPage = () => {
 };
 
 export default SignupPage;
+
+
+---------
+/// memory-app/src/pages/StatisticsPage.tsx
+
+import React from "react";
+import { Box, Text } from "@chakra-ui/react";
+import useProgressStore from "../store/progressStore";
+
+export const StatisticsPage = () => {
+  const { performance } = useProgressStore();
+
+  console.log("Performance data:", performance);
+
+  if (Object.keys(performance).length === 0) {
+    return <Text>Aucune donnée de performance disponible.</Text>;
+  }
+
+  return (
+    <Box>
+      <Text fontSize="2xl" fontWeight="bold">
+        Statistiques
+      </Text>
+      {Object.entries(performance).map(([questionId, data]) => (
+        <Box key={questionId} p={2} borderWidth="1px" borderRadius="md" mt={2}>
+          <Text>
+            <strong>Question ID:</strong> {questionId}
+          </Text>
+          <Text>
+            <strong>Correct:</strong> {data.isCorrect ? "Oui" : "Non"}
+          </Text>
+          <Text>
+            <strong>Tentatives:</strong> {data.attempts}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+export default StatisticsPage;
+
+
+---------
+/// memory-app/src/pages/SummaryPage.tsx
+
+import React, { useEffect, useState } from "react";
+import { Box, Text, VStack, Button, Spinner, Stack } from "@chakra-ui/react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useApi } from "../hooks/useApi";
+
+interface PerformanceEntry {
+  questionId: string;
+  isCorrect: boolean;
+  attempts: number;
+}
+
+interface SummaryData {
+  score: number;
+  performance: PerformanceEntry[];
+  totalQuestions: number;
+  knowledgeSetName: string;
+}
+
+export const SummaryPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const gameStateId = queryParams.get("gameStateId");
+
+  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const { getGamePerformance } = useApi(); // Utiliser useApi pour récupérer les performances
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      if (!gameStateId || gameStateId === "null") {
+        setError("Identifiant de session manquant ou invalide.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await getGamePerformance(gameStateId);
+        if (response.error) {
+          setError(
+            response.message || "Erreur lors de la récupération des données."
+          );
+        } else {
+          setSummaryData(response.data);
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Erreur lors de la récupération des données.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameStateId]);
+
+  const handleReturnHome = () => {
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <Box textAlign="center" mt="10">
+        <Spinner size="xl" />
+        <Text mt={4}>Chargement des données...</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box textAlign="center" mt="10">
+        <Text color="red.500">{error}</Text>
+        <Button mt={4} colorScheme="blue" onClick={handleReturnHome}>
+          Retour à l'Accueil
+        </Button>
+      </Box>
+    );
+  }
+
+  return (
+    <Box maxW="lg" mx="auto" mt="10" p="6" borderWidth="1px" borderRadius="lg">
+      <VStack spacing="6" align="start">
+        <Text fontSize="2xl" fontWeight="bold">
+          Résumé de la Partie
+        </Text>
+        <Text>Nom du Set: {summaryData?.knowledgeSetName}</Text>
+        <Text>Score Total: {summaryData?.score}</Text>
+        <Text>
+          Réponses Correctes:{" "}
+          {summaryData?.performance.filter((p) => p.isCorrect).length} /{" "}
+          {summaryData?.totalQuestions}
+        </Text>
+        <Box w="100%">
+          <Text fontWeight="bold" mb={2}>
+            Détails des Questions:
+          </Text>
+          <Stack>
+            {summaryData?.performance.map((entry) => (
+              <Box
+                key={entry.questionId}
+                p={2}
+                borderWidth="1px"
+                borderRadius="md"
+                mt={2}
+              >
+                <Text>Question ID: {entry.questionId}</Text>
+                <Text>Correcte: {entry.isCorrect ? "Oui" : "Non"}</Text>
+                <Text>Tentatives: {entry.attempts}</Text>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+        <Button colorScheme="blue" onClick={handleReturnHome}>
+          Retour à l'Accueil
+        </Button>
+      </VStack>
+    </Box>
+  );
+};
+
+export default SummaryPage;
 
 
 ---------
@@ -1925,20 +2550,22 @@ interface GameState {
   currentQuestion: MemoryCardType | null;
   questions: MemoryCardType[];
   currentQuestionIndex: number;
-  totalQuestions: number;
   gameTimer: number;
   questionTimer: number;
   feedback: string;
   showNextButton: boolean;
-  correctAnswer: string | null;
+  correctAnswer: string | null; // Ajouté
+  totalQuestions: number; // Ajouté
+  gameStateId: string | null; // Ajouté
   setCurrentQuestion: (question: MemoryCardType) => void;
+  setFeedback: (feedback: string) => void;
+  setCorrectAnswer: (answer: string | null) => void; // Ajouté
+  setCurrentQuestionIndex: (index: number) => void; // Ajouté
+  setTotalQuestions: (total: number) => void; // Ajouté
+  setGameStateId: (id: string | null) => void; // Ajouté
   setGameTimer: (timer: number | ((prev: number) => number)) => void;
   setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
-  setFeedback: (feedback: string) => void;
   setShowNextButton: (show: boolean) => void;
-  setCorrectAnswer: (answer: string | null) => void;
-  setCurrentQuestionIndex: (index: number) => void;
-  setTotalQuestions: (total: number) => void;
   nextQuestion: () => void;
   setQuestions: (questions: MemoryCardType[]) => void;
 }
@@ -1947,68 +2574,49 @@ const useGameStore = create<GameState>((set) => ({
   currentQuestion: null,
   questions: [],
   currentQuestionIndex: 0,
-  totalQuestions: 0,
-  gameTimer: 300,
-  questionTimer: 10,
+  gameTimer: 300, // Temps total du jeu en secondes
+  questionTimer: 10, // Temps par question en secondes
   feedback: "",
   showNextButton: false,
-  correctAnswer: null,
-  setCurrentQuestion: (question) => {
-    console.log("Setting currentQuestion:", question);
-    set({ currentQuestion: question });
-  },
+  correctAnswer: null, // Initialisé
+  totalQuestions: 0, // Initialisé
+  gameStateId: null, // Initialisé
+  setCurrentQuestion: (question) => set({ currentQuestion: question }),
+  setFeedback: (feedback) => set({ feedback }),
+  setCorrectAnswer: (answer) => set({ correctAnswer: answer }),
+  setCurrentQuestionIndex: (index) => set({ currentQuestionIndex: index }),
+  setTotalQuestions: (total) => set({ totalQuestions: total }),
+  setGameStateId: (id) => set({ gameStateId: id }),
   setGameTimer: (timer) =>
-    set((state) => {
-      const newTimer =
-        typeof timer === "function" ? timer(state.gameTimer) : timer;
-      console.log("Setting gameTimer:", newTimer);
-      return { gameTimer: newTimer };
-    }),
+    set((state) => ({
+      gameTimer: typeof timer === "function" ? timer(state.gameTimer) : timer,
+    })),
   setQuestionTimer: (timer) =>
-    set((state) => {
-      const newTimer =
-        typeof timer === "function" ? timer(state.questionTimer) : timer;
-      console.log("Setting questionTimer:", newTimer);
-      return { questionTimer: newTimer };
-    }),
-  setFeedback: (feedback) => {
-    console.log("Setting feedback:", feedback);
-    set({ feedback });
-  },
-  setShowNextButton: (show) => {
-    console.log("Setting showNextButton:", show);
-    set({ showNextButton: show });
-  },
-  setCorrectAnswer: (answer) => {
-    console.log("Setting correctAnswer:", answer);
-    set({ correctAnswer: answer });
-  },
-  setCurrentQuestionIndex: (index) => {
-    console.log("Setting currentQuestionIndex:", index);
-    set({ currentQuestionIndex: index });
-  },
-  setTotalQuestions: (total) => {
-    console.log("Setting totalQuestions:", total);
-    set({ totalQuestions: total });
-  },
+    set((state) => ({
+      questionTimer:
+        typeof timer === "function" ? timer(state.questionTimer) : timer,
+    })),
+  setShowNextButton: (show) => set({ showNextButton: show }),
   nextQuestion: () =>
     set((state) => {
       const nextIndex = state.currentQuestionIndex + 1;
       if (nextIndex < state.questions.length) {
-        console.log("Moving to next question, index:", nextIndex);
         return {
           currentQuestionIndex: nextIndex,
           currentQuestion: state.questions[nextIndex],
-          questionTimer: 10,
+          questionTimer: 10, // Réinitialiser le timer de la question
           showNextButton: false,
+          correctAnswer: null, // Réinitialiser la bonne réponse
         };
       }
-      return state;
+      return state; // Aucun changement si c'est la dernière question
     }),
-  setQuestions: (questions) => {
-    console.log("Setting questions:", questions);
-    set({ questions, currentQuestion: questions[0] });
-  },
+  setQuestions: (questions) =>
+    set({
+      questions,
+      currentQuestion: questions[0],
+      totalQuestions: questions.length,
+    }),
 }));
 
 export default useGameStore;
@@ -2032,6 +2640,84 @@ const useUserStore = create<UserState>((set) => ({
 }));
 
 export default useUserStore;
+
+
+---------
+/// memory-app/src/store/progressStore.ts
+
+import { create } from "zustand";
+
+interface Performance {
+  [questionId: string]: {
+    isCorrect: boolean;
+    attempts: number;
+  };
+}
+
+interface ProgressState {
+  score: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  badges: string[];
+  performance: Performance;
+  incrementScore: () => void;
+  setTotalQuestions: (total: number) => void;
+  addBadge: (badge: string) => void;
+  recordPerformance: (questionId: string, isCorrect: boolean) => void;
+}
+
+const useProgressStore = create<ProgressState>((set) => ({
+  score: 0,
+  correctAnswers: 0,
+  totalQuestions: 0,
+  badges: [],
+  performance: {},
+  incrementScore: () =>
+    set((state) => {
+      const newCorrectAnswers = state.correctAnswers + 1;
+      const newScore = state.score + 10;
+      const newBadges = [...state.badges];
+
+      // Débloquer un badge tous les 5 bonnes réponses
+      if (newCorrectAnswers % 5 === 0) {
+        newBadges.push(`Badge ${newCorrectAnswers / 5}`);
+      }
+
+      return {
+        score: newScore,
+        correctAnswers: newCorrectAnswers,
+        badges: newBadges,
+      };
+    }),
+  setTotalQuestions: (total) => set({ totalQuestions: total }),
+  addBadge: (badge) =>
+    set((state) => ({
+      badges: [...state.badges, badge],
+    })),
+  recordPerformance: (questionId, isCorrect) =>
+    set((state) => {
+      console.log(
+        "Recording performance for questionId:",
+        questionId,
+        "isCorrect:",
+        isCorrect
+      );
+      const currentPerformance = state.performance[questionId] || {
+        isCorrect: false,
+        attempts: 0,
+      };
+      const updatedPerformance = {
+        ...state.performance,
+        [questionId]: {
+          isCorrect: currentPerformance.isCorrect || isCorrect,
+          attempts: currentPerformance.attempts + 1,
+        },
+      };
+      return { performance: updatedPerformance };
+    }),
+}));
+
+export default useProgressStore;
 
 
 ---------

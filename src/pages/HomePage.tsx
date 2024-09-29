@@ -32,6 +32,7 @@ const HomePage = () => {
   const [openModal, setOpenModal] = useState<(() => void) | null>(null);
   const [memoryCards, setMemoryCards] = useState([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const { getUserKnowledgeSets, getActiveSessions } = useApi();
   const navigate = useNavigate();
 
@@ -51,11 +52,15 @@ const HomePage = () => {
     navigate(`/card/${knowledgeSetId}/Quiz?sessionId=${sessionId}`);
   };
 
+  const filteredMemoryCards = memoryCards.filter((card: any) =>
+    card.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <>
-      <ModalAddKnowledgeSet openModal={(fn) => setOpenModal(fn)} />
+      <ModalAddKnowledgeSet openModal={setOpenModal} />
       <Stack>
-        <Header openModal={openModal} />
+        <Header />
         <Divider mt={2} />
         <Tabs>
           <TabList>
@@ -68,8 +73,13 @@ const HomePage = () => {
               <ModeButtons />
             </TabPanel>
             <TabPanel>
-              <Input borderRadius={40} placeholder="Filtre" />
-              <MemoryCardsList memoryCards={memoryCards} />
+              <Input
+                borderRadius={40}
+                placeholder="Rechercher"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <MemoryCardsList memoryCards={filteredMemoryCards} />
             </TabPanel>
             <TabPanel>
               {activeSessions.map((session) => (

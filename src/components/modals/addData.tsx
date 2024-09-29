@@ -56,9 +56,10 @@ export function ModalAddKnowledgeSet({
   const [jsonInput, setJsonInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+
   useEffect(() => {
-    openModal(onOpen);
-  }, [openModal, onOpen]);
+    openModal(() => onOpen);
+  }, []);
 
   // Synchroniser les données lorsque le mode change
   useEffect(() => {

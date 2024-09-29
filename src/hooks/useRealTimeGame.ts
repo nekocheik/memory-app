@@ -1,158 +1,96 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import useGameStore from "../store/gameStore";
+import useUserStore from "../store";
 
-const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_SERVER_URL || "http://localhost:8000";
-
-interface UseRealTimeGameReturn {
-  gameTimer: number;
-  questionTimer: number;
-  handleAnswer: (answer: string) => void;
-  handleNextQuestion: () => void;
-}
-
-const useRealTimeGame = (
-  knowledgeSetId: string,
-  sessionId?: string
-): UseRealTimeGameReturn => {
-  const [socket, setSocket] = useState<Socket | null>(null);
+const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
   const {
     setCurrentQuestion,
-    setQuestionTimer,
     setFeedback,
-    setShowNextButton,
-    setCorrectAnswer,
-    setCurrentQuestionIndex,
     setTotalQuestions,
-    questionTimer,
-    gameTimer,
-    setGameTimer,
+    setCurrentQuestionIndex,
+    setGameStateId,
   } = useGameStore();
+  const userStore = useUserStore();
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const newSocket = io(SOCKET_SERVER_URL, {
+    if (!userStore.token) return;
+
+    const socket: Socket = io("http://localhost:8000", {
       auth: {
-        token: token,
+        token: userStore.token,
       },
     });
-    setSocket(newSocket);
 
-    newSocket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message);
-    });
+    socketRef.current = socket;
 
-    if (sessionId) {
-      newSocket.emit("resumeGame", sessionId);
-    } else {
-      newSocket.emit("startGame", knowledgeSetId);
-    }
+    socket.on("connect", () => {
+      console.log("Connected to game socket");
 
-    newSocket.on("newQuestion", (questionData: any) => {
-      console.log("Received newQuestion:", questionData);
-      setCurrentQuestion({
-        _id: questionData._id,
-        question: questionData.question,
-        answers: questionData.answers,
-        answer: "",
-        isResolve: false,
-      });
-      setFeedback("");
-      setShowNextButton(false);
-
-      setCurrentQuestionIndex(questionData.currentQuestionIndex);
-      setTotalQuestions(questionData.totalQuestions);
-
-      const { timeRemaining } = questionData;
-      setQuestionTimer(timeRemaining);
-    });
-
-    newSocket.on("feedback", (result: any) => {
-      console.log("Received feedback:", result);
-      if (result.timeUp) {
-        setFeedback(
-          "Temps écoulé ! La bonne réponse était : " + result.correctAnswer
-        );
+      if (sessionId) {
+        socket.emit("resumeGame", sessionId);
       } else {
-        setFeedback(
-          result.correct
-            ? "Correct !"
-            : `Incorrect. La bonne réponse était : ${result.correctAnswer}`
-        );
+        socket.emit("startGame", knowledgeSetId);
       }
-      setCorrectAnswer(result.correctAnswer);
-      setShowNextButton(result.showNextButton);
     });
 
-    newSocket.on("gameOver", (data: any) => {
-      console.log("Received gameOver:", data);
-      setFeedback("Partie terminée ! Votre score : " + data.score);
-      setGameTimer(0);
+    socket.on("newQuestion", (data) => {
+      console.log("Received newQuestion:", data);
+      setCurrentQuestion(data);
+      setCurrentQuestionIndex(data.currentQuestionIndex);
+      setTotalQuestions(data.totalQuestions);
+      setGameStateId(data.gameStateId || null);
+      setFeedback(null); // Réinitialiser le feedback pour la nouvelle question
     });
 
-    newSocket.on("error", (message: string) => {
-      console.error("Socket error:", message);
-      setFeedback("Erreur : " + message);
+    socket.on("feedback", (data) => {
+      console.log("Received feedback:", data);
+      setFeedback(data); // data doit correspondre au type FeedbackType
+    });
+
+    socket.on("gameOver", (data) => {
+      console.log("Game over:", data);
+      setFeedback({ correct: false, showNextButton: false }); // Vous pouvez ajuster selon vos besoins
+    });
+
+    socket.on("error", (errorMessage: string) => {
+      console.error("Socket error:", errorMessage);
+      setFeedback({ correct: false, showNextButton: false });
     });
 
     return () => {
-      newSocket.disconnect();
+      socket.disconnect();
     };
   }, [
     knowledgeSetId,
     sessionId,
+    userStore.token,
     setCurrentQuestion,
-    setQuestionTimer,
     setFeedback,
-    setShowNextButton,
-    setCurrentQuestionIndex,
     setTotalQuestions,
-    setGameTimer,
-    setCorrectAnswer,
+    setCurrentQuestionIndex,
+    setGameStateId,
   ]);
 
-  useEffect(() => {
-    if (questionTimer <= 0) return;
+  const handleAnswer = (answer: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit("submitAnswer", { answer });
+    }
+  };
 
-    const interval = setInterval(() => {
-      setQuestionTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [questionTimer, setQuestionTimer]);
-
-  useEffect(() => {
-    if (gameTimer <= 0) return;
-
-    const interval = setInterval(() => {
-      setGameTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [gameTimer, setGameTimer]);
-
-  const handleAnswer = useCallback(
-    (answer: string) => {
-      console.log("Submitting answer:", answer);
-      socket?.emit("submitAnswer", {
-        answer,
-      });
-    },
-    [socket]
-  );
-
-  const handleNextQuestion = useCallback(() => {
-    console.log("Requesting next question");
-    socket?.emit("nextQuestion");
-    setCorrectAnswer(null); // Réinitialise la bonne réponse
-  }, [socket, setCorrectAnswer]);
+  const handleNextQuestion = () => {
+    if (socketRef.current) {
+      socketRef.current.emit("nextQuestion");
+    }
+  };
 
   return {
-    gameTimer,
-    questionTimer,
+    gameTimer: 0,
+    questionTimer: 0,
     handleAnswer,
     handleNextQuestion,
+    gameStateId: useGameStore.getState().gameStateId,
   };
 };
 

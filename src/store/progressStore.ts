@@ -26,27 +26,48 @@ const useProgressStore = create<ProgressState>((set) => ({
   badges: [],
   performance: {},
   incrementScore: () =>
-    set((state) => ({
-      score: state.score + 10, // Exemple : 10 points par bonne réponse
-      correctAnswers: state.correctAnswers + 1,
-    })),
+    set((state) => {
+      const newCorrectAnswers = state.correctAnswers + 1;
+      const newScore = state.score + 10;
+      const newBadges = [...state.badges];
+
+      // Débloquer un badge tous les 5 bonnes réponses
+      if (newCorrectAnswers % 5 === 0) {
+        newBadges.push(`Badge ${newCorrectAnswers / 5}`);
+      }
+
+      return {
+        score: newScore,
+        correctAnswers: newCorrectAnswers,
+        badges: newBadges,
+      };
+    }),
   setTotalQuestions: (total) => set({ totalQuestions: total }),
   addBadge: (badge) =>
     set((state) => ({
       badges: [...state.badges, badge],
     })),
   recordPerformance: (questionId, isCorrect) =>
-    set((state) => ({
-      performance: {
+    set((state) => {
+      console.log(
+        "Recording performance for questionId:",
+        questionId,
+        "isCorrect:",
+        isCorrect
+      );
+      const currentPerformance = state.performance[questionId] || {
+        isCorrect: false,
+        attempts: 0,
+      };
+      const updatedPerformance = {
         ...state.performance,
         [questionId]: {
-          isCorrect,
-          attempts: state.performance[questionId]
-            ? state.performance[questionId].attempts + 1
-            : 1,
+          isCorrect: currentPerformance.isCorrect || isCorrect,
+          attempts: currentPerformance.attempts + 1,
         },
-      },
-    })),
+      };
+      return { performance: updatedPerformance };
+    }),
 }));
 
 export default useProgressStore;

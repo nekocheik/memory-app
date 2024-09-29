@@ -1,8 +1,7 @@
-import React from "react";
-import { Box, Text, Button, VStack, HStack, Progress } from "@chakra-ui/react";
-import useRealTimeGame from "../hooks/useRealTimeGame";
+import React, { useState } from "react";
+import { VStack, Text, Button, HStack, Box } from "@chakra-ui/react";
 import useGameStore from "../store/gameStore";
-import { MCard } from "./GameMode/Card";
+import useRealTimeGame from "../hooks/useRealTimeGame";
 
 interface RealTimeGameProps {
   knowledgeSetId: string;
@@ -13,40 +12,39 @@ const RealTimeGame: React.FC<RealTimeGameProps> = ({
   knowledgeSetId,
   sessionId,
 }) => {
-  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
-    useRealTimeGame(knowledgeSetId, sessionId || undefined);
-  const { currentQuestion, feedback, showNextButton } = useGameStore();
+  const { currentQuestion, feedback } = useGameStore();
+  const { handleAnswer, handleNextQuestion } = useRealTimeGame(
+    knowledgeSetId,
+    sessionId || undefined
+  );
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+
+  const onAnswerClick = (answer: string) => {
+    if (selectedAnswer) return;
+    setSelectedAnswer(answer);
+    handleAnswer(answer);
+  };
 
   if (!currentQuestion) {
-    return <Text>Waiting for the game to start...</Text>;
+    return <Text>Chargement de la question...</Text>;
   }
 
   return (
-    <VStack spacing={4} align="stretch">
-      <Box>
-        <Text fontWeight="bold">Game Time Remaining:</Text>
-        <Text>
-          {Math.floor(gameTimer / 60)}:
-          {(gameTimer % 60).toString().padStart(2, "0")}
-        </Text>
-        <Progress value={(gameTimer / 300) * 100} />
-      </Box>
-
-      <MCard text={currentQuestion.question} />
-
-      <Box>
-        <Text fontWeight="bold">Time Remaining for this Question:</Text>
-        <Text>{Math.ceil(questionTimer)} seconds</Text>
-        <Progress value={(questionTimer / 10) * 100} colorScheme="green" />
-      </Box>
-
-      <HStack spacing={4} wrap="wrap" justify="center">
+    <VStack spacing={4}>
+      <Text fontSize="xl">{currentQuestion.question}</Text>
+      <HStack spacing={4}>
         {currentQuestion.answers.map((answer, index) => (
           <Button
             key={index}
-            onClick={() => handleAnswer(answer.text)}
-            colorScheme="blue"
-            isDisabled={questionTimer === 0 || showNextButton}
+            onClick={() => onAnswerClick(answer.text)}
+            colorScheme={
+              feedback && feedback.correctAnswer === answer.text
+                ? "green"
+                : selectedAnswer === answer.text
+                ? "red"
+                : "blue"
+            }
+            disabled={!!selectedAnswer}
           >
             {answer.text}
           </Button>
@@ -56,16 +54,21 @@ const RealTimeGame: React.FC<RealTimeGameProps> = ({
       {feedback && (
         <Box
           p={3}
-          bg={feedback.includes("Correct") ? "green.100" : "red.100"}
+          bg={feedback.correct ? "green.100" : "red.100"}
           borderRadius="md"
         >
-          <Text fontWeight="bold">{feedback}</Text>
+          <Text fontWeight="bold">
+            {feedback.correct ? "Bonne réponse !" : "Mauvaise réponse."}
+          </Text>
+          {!feedback.correct && feedback.correctAnswer && (
+            <Text>La bonne réponse était : {feedback.correctAnswer}</Text>
+          )}
         </Box>
       )}
 
-      {showNextButton && (
+      {feedback && feedback.showNextButton && (
         <Button onClick={handleNextQuestion} colorScheme="teal">
-          Next Question
+          Question Suivante
         </Button>
       )}
     </VStack>

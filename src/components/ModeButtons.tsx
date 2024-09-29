@@ -1,40 +1,24 @@
-import { SimpleGrid, Button } from "@chakra-ui/react";
+import { HStack, Button } from "@chakra-ui/react";
+import { Link } from "react-router-dom";
 
-import type { GameMode } from "../Types/index";
+interface ModeButtonsProps {
+  cardId?: string | null;
+}
 
-export const ModeButtons = ({ cardId }: { cardId?: string | null }) => {
-  function selectMode(mode: GameMode) {
-    console.log({ cardId });
-    const newPath = `/card/${cardId}/${mode}`;
-    window.location.href = newPath;
-  }
-
+export const ModeButtons: React.FC<ModeButtonsProps> = ({ cardId = "0" }) => {
   return (
-    <SimpleGrid spacing={4}>
-      <Button
-        onClick={() => selectMode("Quiz")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        QUIZ
-      </Button>
-      <Button
-        onClick={() => selectMode("Repetition")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        REPETITION
-      </Button>
-      <Button
-        onClick={() => selectMode("FollowUp")}
-        fontSize={23}
-        height={24}
-        w="100%"
-      >
-        SUIVI
-      </Button>
-    </SimpleGrid>
+    <HStack spacing={4}>
+      <Link to={`/card/${cardId}/Quiz`}>
+        <Button colorScheme="blue">Quiz</Button>
+      </Link>
+      <Link to={`/card/${cardId}/RealTime`}>
+        <Button colorScheme="green">Temps Réel</Button>
+      </Link>
+      <Link to={`/card/${cardId}/Repetition`}>
+        <Button colorScheme="purple">Répétition</Button>
+      </Link>
+    </HStack>
   );
 };
+
+export default ModeButtons;

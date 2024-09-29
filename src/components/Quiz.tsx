@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Stack, Text, Button, VStack, Box } from "@chakra-ui/react";
-import { MCard } from "./GameMode/Card";
+import { MCard } from "../components/GameMode/Card";
 import useGameStore from "../store/gameStore";
 import useRealTimeGame from "../hooks/useRealTimeGame";
+import { useNavigate } from "react-router-dom";
 
 interface QuizProps {
   knowledgeSetId: string;
@@ -10,80 +11,71 @@ interface QuizProps {
 }
 
 export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
-  const {
-    currentQuestion,
-    feedback,
-    correctAnswer,
-    setCorrectAnswer,
-    currentQuestionIndex,
-    totalQuestions,
-  } = useGameStore();
-  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
-    useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const { currentQuestion, feedback, currentQuestionIndex, totalQuestions } =
+    useGameStore();
+  const { handleAnswer, handleNextQuestion } = useRealTimeGame(
+    knowledgeSetId,
+    sessionId || undefined
+  );
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
+  const navigate = useNavigate();
 
-  // Vérifier la valeur de correctAnswer
   useEffect(() => {
-    console.log("Correct Answer:", correctAnswer);
-  }, [correctAnswer]);
+    if (feedback && feedback.correct !== undefined) {
+      // Gérer le feedback ici
+    }
+  }, [feedback]);
+
+  const onAnswerClick = (answer: string) => {
+    if (selectedAnswer) return; // Empêche de répondre plusieurs fois
+    setSelectedAnswer(answer);
+    handleAnswer(answer);
+  };
+
+  const onNextClick = () => {
+    setSelectedAnswer(null);
+    handleNextQuestion();
+  };
 
   if (!currentQuestion) {
     return <Text>Chargement de la question...</Text>;
   }
 
-  const onAnswerClick = (answer: string) => {
-    if (isAnswered) return;
-    setSelectedAnswer(answer);
-    setIsAnswered(true);
-    handleAnswer(answer);
-  };
-
-  const onNextClick = () => {
-    handleNextQuestion();
-    setSelectedAnswer(null);
-    setIsAnswered(false);
-    setCorrectAnswer(null); // Réinitialise la bonne réponse
-  };
-
   return (
-    <VStack spacing={4}>
+    <VStack spacing={4} align="stretch">
       <MCard text={currentQuestion.question} />
-      <Text>
-        Temps de jeu : {Math.floor(gameTimer / 60)}:
-        {(gameTimer % 60).toString().padStart(2, "0")}
-      </Text>
-      <Text>
-        Temps pour cette question : {Math.ceil(questionTimer)} secondes
-      </Text>
       <Text>
         Question {currentQuestionIndex + 1} sur {totalQuestions}
       </Text>
-      <Stack width="100%">
-        {currentQuestion.answers.map((answer, index) => (
-          <Button
-            key={index}
-            onClick={() => onAnswerClick(answer.text)}
-            colorScheme={
-              isAnswered
-                ? answer.isCorrect
-                  ? "green"
-                  : selectedAnswer === answer.text
-                  ? "red"
-                  : "gray"
-                : "blue"
+      <Stack width="100%" spacing={2}>
+        {currentQuestion.answers.map((answer, index) => {
+          let colorScheme = "blue";
+          if (feedback && selectedAnswer) {
+            if (feedback.correctAnswer === answer.text) {
+              colorScheme = "green";
+            } else if (selectedAnswer === answer.text) {
+              colorScheme = "red";
+            } else {
+              colorScheme = "gray";
             }
-            disabled={isAnswered}
-            width="100%"
-          >
-            {answer.text}
-          </Button>
-        ))}
+          }
+          return (
+            <Button
+              key={index}
+              onClick={() => onAnswerClick(answer.text)}
+              colorScheme={colorScheme}
+              disabled={!!selectedAnswer}
+              width="100%"
+            >
+              {answer.text}
+            </Button>
+          );
+        })}
       </Stack>
-      {isAnswered && (
+      {feedback && feedback.showNextButton && (
         <Box width="100%" textAlign="center">
           <Text fontWeight="bold" mb={2}>
-            {feedback}
+            {feedback.correct ? "Bonne réponse !" : "Mauvaise réponse."}
           </Text>
           <Button colorScheme="blue" onClick={onNextClick} width="100%">
             Question Suivante

@@ -1,24 +1,34 @@
 import { create } from "zustand";
 import { MemoryCardType } from "../Types";
 
+// Définir le type FeedbackType
+interface FeedbackType {
+  correct?: boolean;
+  correctAnswer?: string;
+  showNextButton?: boolean;
+  timeUp?: boolean;
+}
+
 interface GameState {
   currentQuestion: MemoryCardType | null;
   questions: MemoryCardType[];
   currentQuestionIndex: number;
-  totalQuestions: number;
   gameTimer: number;
   questionTimer: number;
-  feedback: string;
+  feedback: FeedbackType | null; // Mettre à jour le type ici
   showNextButton: boolean;
   correctAnswer: string | null;
+  totalQuestions: number;
+  gameStateId: string | null;
   setCurrentQuestion: (question: MemoryCardType) => void;
-  setGameTimer: (timer: number | ((prev: number) => number)) => void;
-  setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
-  setFeedback: (feedback: string) => void;
-  setShowNextButton: (show: boolean) => void;
+  setFeedback: (feedback: FeedbackType | null) => void; // Mettre à jour le type ici
   setCorrectAnswer: (answer: string | null) => void;
   setCurrentQuestionIndex: (index: number) => void;
   setTotalQuestions: (total: number) => void;
+  setGameStateId: (id: string | null) => void;
+  setGameTimer: (timer: number | ((prev: number) => number)) => void;
+  setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
+  setShowNextButton: (show: boolean) => void;
   nextQuestion: () => void;
   setQuestions: (questions: MemoryCardType[]) => void;
 }
@@ -27,68 +37,49 @@ const useGameStore = create<GameState>((set) => ({
   currentQuestion: null,
   questions: [],
   currentQuestionIndex: 0,
-  totalQuestions: 0,
   gameTimer: 300,
   questionTimer: 10,
-  feedback: "",
+  feedback: null, // Initialiser à null
   showNextButton: false,
   correctAnswer: null,
-  setCurrentQuestion: (question) => {
-    console.log("Setting currentQuestion:", question);
-    set({ currentQuestion: question });
-  },
+  totalQuestions: 0,
+  gameStateId: null,
+  setCurrentQuestion: (question) => set({ currentQuestion: question }),
+  setFeedback: (feedback) => set({ feedback }),
+  setCorrectAnswer: (answer) => set({ correctAnswer: answer }),
+  setCurrentQuestionIndex: (index) => set({ currentQuestionIndex: index }),
+  setTotalQuestions: (total) => set({ totalQuestions: total }),
+  setGameStateId: (id) => set({ gameStateId: id }),
   setGameTimer: (timer) =>
-    set((state) => {
-      const newTimer =
-        typeof timer === "function" ? timer(state.gameTimer) : timer;
-      console.log("Setting gameTimer:", newTimer);
-      return { gameTimer: newTimer };
-    }),
+    set((state) => ({
+      gameTimer: typeof timer === "function" ? timer(state.gameTimer) : timer,
+    })),
   setQuestionTimer: (timer) =>
-    set((state) => {
-      const newTimer =
-        typeof timer === "function" ? timer(state.questionTimer) : timer;
-      console.log("Setting questionTimer:", newTimer);
-      return { questionTimer: newTimer };
-    }),
-  setFeedback: (feedback) => {
-    console.log("Setting feedback:", feedback);
-    set({ feedback });
-  },
-  setShowNextButton: (show) => {
-    console.log("Setting showNextButton:", show);
-    set({ showNextButton: show });
-  },
-  setCorrectAnswer: (answer) => {
-    console.log("Setting correctAnswer:", answer);
-    set({ correctAnswer: answer });
-  },
-  setCurrentQuestionIndex: (index) => {
-    console.log("Setting currentQuestionIndex:", index);
-    set({ currentQuestionIndex: index });
-  },
-  setTotalQuestions: (total) => {
-    console.log("Setting totalQuestions:", total);
-    set({ totalQuestions: total });
-  },
+    set((state) => ({
+      questionTimer:
+        typeof timer === "function" ? timer(state.questionTimer) : timer,
+    })),
+  setShowNextButton: (show) => set({ showNextButton: show }),
   nextQuestion: () =>
     set((state) => {
       const nextIndex = state.currentQuestionIndex + 1;
       if (nextIndex < state.questions.length) {
-        console.log("Moving to next question, index:", nextIndex);
         return {
           currentQuestionIndex: nextIndex,
           currentQuestion: state.questions[nextIndex],
           questionTimer: 10,
           showNextButton: false,
+          correctAnswer: null,
         };
       }
       return state;
     }),
-  setQuestions: (questions) => {
-    console.log("Setting questions:", questions);
-    set({ questions, currentQuestion: questions[0] });
-  },
+  setQuestions: (questions) =>
+    set({
+      questions,
+      currentQuestion: questions[0],
+      totalQuestions: questions.length,
+    }),
 }));
 
 export default useGameStore;

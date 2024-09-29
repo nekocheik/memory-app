@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Text, Flex, Stack, Progress, Button } from "@chakra-ui/react";
+import { Text, Flex, Stack, Progress, Button, Box } from "@chakra-ui/react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "../components/Header";
 import { Quiz } from "../components/Quiz";
@@ -7,6 +7,7 @@ import RealTimeGame from "../components/RealTimeGame";
 import { useApi } from "../hooks/useApi";
 import useGameStore from "../store/gameStore";
 import { KnowledgeSet } from "../Types";
+import useProgressStore from "../store/progressStore";
 
 export const GameModes = () => {
   const { gameMode = "Quiz", id = "0" } = useParams<{
@@ -30,6 +31,9 @@ export const GameModes = () => {
   const [error, setError] = useState<string | null>(null);
   const [knowledgeSet, setKnowledgeSet] = useState<KnowledgeSet | null>(null);
 
+  const { score, correctAnswers, badges, setTotalQuestions } =
+    useProgressStore();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -40,7 +44,8 @@ export const GameModes = () => {
         if (data && data.cards && data.cards.length > 0) {
           setKnowledgeSet(data);
           setQuestions(data.cards);
-          setGameTimer(data.timeLimit || 300); // Utilise le temps total spécifique
+          setGameTimer(data.timeLimit || 300);
+          setTotalQuestions(data.cards.length);
         } else {
           setError("No questions found in this knowledge set.");
         }
@@ -52,11 +57,10 @@ export const GameModes = () => {
       }
     };
     fetchData();
-  }, [id, getKnowledgeSetById, setQuestions, setGameTimer]);
+  }, [id, getKnowledgeSetById, setQuestions, setGameTimer, setTotalQuestions]);
 
   const handleEndGame = () => {
-    // Ici, vous pouvez ajouter la logique pour sauvegarder les résultats du jeu si nécessaire
-    navigate("/"); // Retourne à la page d'accueil
+    navigate("/");
   };
 
   if (isLoading) return <Text>Loading...</Text>;
@@ -83,7 +87,15 @@ export const GameModes = () => {
         <RealTimeGame knowledgeSetId={id} sessionId={sessionId} />
       )}
 
-      <Text mt={4}>{feedback}</Text>
+      {feedback && (
+        <Text mt={4}>
+          {feedback.correct
+            ? "Bonne réponse !"
+            : feedback.timeUp
+            ? "Temps écoulé !"
+            : "Mauvaise réponse."}
+        </Text>
+      )}
 
       <Flex justify="space-between">
         <Text>
@@ -93,6 +105,13 @@ export const GameModes = () => {
           Terminer la partie
         </Button>
       </Flex>
+      <Box>
+        <Text>Score: {score}</Text>
+        <Text>
+          Progression: {correctAnswers} / {totalQuestions}
+        </Text>
+        <Text>Badges débloqués: {badges.join(", ")}</Text>
+      </Box>
     </Stack>
   );
 };
