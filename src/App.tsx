@@ -18,6 +18,9 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import RepetitionMode from "./components/RepetitionMode";
 import useUserStore from "./store";
 import SummaryPage from "./pages/SummaryPage"; // Importez la nouvelle page
+import { XListPage } from "./pages/XListPage";
+import { XDetailPage } from "./pages/XDetailPage";
+import { XForm } from "./components/XForm";
 
 export const App = () => {
   const { showNotification } = useNotification();
@@ -106,6 +109,38 @@ export const App = () => {
               element={
                 <ProtectedRoute>
                   <RepetitionMode />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x"
+              element={
+                <ProtectedRoute>
+                  <XListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/new"
+              element={
+                <ProtectedRoute>
+                  <XForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/:id"
+              element={
+                <ProtectedRoute>
+                  <XDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <XForm />
                 </ProtectedRoute>
               }
             />

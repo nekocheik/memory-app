@@ -33,7 +33,7 @@ api.interceptors.response.use(
   (error) => {
     console.error("Error in response:", error.response?.data || error.message);
 
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 403) {
       // Déconnexion de l'utilisateur
       useUserStore.getState().clearToken();
       localStorage.removeItem("access_token");
@@ -54,6 +54,7 @@ const PATH = {
   activeSessions: "/api/game/sessions/active",
   knowledgeSets: "/api/knowledge-set",
   gamePerformance: "/api/game/performance", // Ajouté pour récupérer les performances
+  x: "/api/x",
 };
 
 // Fonction pour définir le token dans le store et le localStorage
@@ -190,6 +191,46 @@ const getGamePerformance = async (gameStateId: string) => {
   }
 };
 
+const getAllX = async () => {
+  try {
+    const response = await api.get(PATH.x);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to get all X:", error);
+    throw error;
+  }
+};
+
+const createX = async (xData: any) => {
+  try {
+    const response = await api.post(PATH.x, xData);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to create X:", error);
+    throw error;
+  }
+};
+
+const updateX = async (id: string, updates: any) => {
+  try {
+    const response = await api.put(`${PATH.x}/${id}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to update X:", error);
+    throw error;
+  }
+};
+
+const getXById = async (id: string) => {
+  try {
+    const response = await api.get(`${PATH.x}/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to get X by id:", error);
+    throw error;
+  }
+};
+
 // Exportez vos fonctions via le hook useApi
 export const useApi = () => {
   return {
@@ -200,6 +241,10 @@ export const useApi = () => {
     login,
     getActiveSessions,
     getUserKnowledgeSets,
+    createX,
+    getAllX,
+    getXById,
+    updateX,
     sendFeedback,
     getGamePerformance, // Exporté pour utiliser dans SummaryPage
   };

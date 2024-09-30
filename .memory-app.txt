@@ -35,6 +35,9 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import RepetitionMode from "./components/RepetitionMode";
 import useUserStore from "./store";
 import SummaryPage from "./pages/SummaryPage"; // Importez la nouvelle page
+import { XListPage } from "./pages/XListPage";
+import { XDetailPage } from "./pages/XDetailPage";
+import { XForm } from "./components/XForm";
 
 export const App = () => {
   const { showNotification } = useNotification();
@@ -123,6 +126,38 @@ export const App = () => {
               element={
                 <ProtectedRoute>
                   <RepetitionMode />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x"
+              element={
+                <ProtectedRoute>
+                  <XListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/new"
+              element={
+                <ProtectedRoute>
+                  <XForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/:id"
+              element={
+                <ProtectedRoute>
+                  <XDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/x/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <XForm />
                 </ProtectedRoute>
               }
             />
@@ -224,6 +259,44 @@ export interface MemoryCardType {
   isResolve?: boolean;
   _id: string;
   timeLimit?: number; // Ajout du temps pour chaque question
+}
+
+export interface IProperty {
+  name: string;
+  value: any;
+  type: string;
+  isList?: boolean;
+  required?: boolean;
+  inheritedFrom?: string; // ID de l'objet X
+}
+
+export interface IX {
+  _id: string;
+  properties: IProperty[];
+  label?: string; // ID de l'étiquette
+  versions?: string[]; // IDs des versions précédentes
+  relations?: { type: string; target: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Property {
+  name: string;
+  value: any;
+  type: string;
+  isList?: boolean;
+  required?: boolean;
+  inheritedFrom?: string; // ID de l'objet X
+}
+
+export interface XType {
+  _id: string;
+  properties: Property[];
+  label?: string; // ID de l'étiquette
+  versions?: string[]; // IDs des versions précédentes
+  relations?: { type: string; target: string }[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ID = string;
@@ -439,9 +512,7 @@ import { Stack, Text, Button, VStack, Box } from "@chakra-ui/react";
 import { MCard } from "../components/GameMode/Card";
 import useGameStore from "../store/gameStore";
 import useRealTimeGame from "../hooks/useRealTimeGame";
-import useProgressStore from "../store/progressStore";
 import { useNavigate } from "react-router-dom";
-import { useApi } from "../hooks/useApi";
 
 interface QuizProps {
   knowledgeSetId: string;
@@ -449,128 +520,71 @@ interface QuizProps {
 }
 
 export const Quiz: React.FC<QuizProps> = ({ knowledgeSetId, sessionId }) => {
-  const {
-    currentQuestion,
-    feedback,
-    correctAnswer,
-    setCorrectAnswer,
-    currentQuestionIndex,
-    totalQuestions,
-  } = useGameStore();
-  const {
-    gameTimer,
-    questionTimer,
-    handleAnswer,
-    handleNextQuestion,
-    gameStateId,
-  } = useRealTimeGame(knowledgeSetId, sessionId || undefined);
+  const { currentQuestion, feedback, currentQuestionIndex, totalQuestions } =
+    useGameStore();
+  const { handleAnswer, handleNextQuestion } = useRealTimeGame(
+    knowledgeSetId,
+    sessionId || undefined
+  );
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
-  const { incrementScore, addBadge, correctAnswers, recordPerformance } =
-    useProgressStore();
   const navigate = useNavigate();
-  const { sendFeedback } = useApi(); // Utiliser useApi pour envoyer des feedbacks
 
-  // Navigation vers la page de résumé lorsque le quiz est terminé
   useEffect(() => {
-    if (feedback.startsWith("Partie terminée !")) {
-      if (gameStateId) {
-        navigate(`/summary?gameStateId=${gameStateId}`);
-      } else {
-        console.error("gameStateId is null or undefined");
-        // Optionnellement, afficher un message d'erreur ou rediriger ailleurs
-      }
+    if (feedback && feedback.correct !== undefined) {
+      // Gérer le feedback ici
     }
-  }, [feedback, navigate, gameStateId]);
-
-  // Enregistrer la performance après avoir reçu le feedback
-  useEffect(() => {
-    if (feedback && currentQuestion && !isAnswered) {
-      const isCorrect = feedback.includes("Correct");
-      if (isCorrect) {
-        incrementScore();
-        // Débloquer un badge tous les 5 bonnes réponses
-        if ((correctAnswers + 1) % 5 === 0) {
-          addBadge(`Badge ${Math.floor((correctAnswers + 1) / 5)}`);
-        }
-      }
-      console.log("Recording performance for question:", currentQuestion._id);
-      recordPerformance(currentQuestion._id.toString(), isCorrect);
-
-      // Envoyer un feedback au backend
-      sendFeedback(
-        currentQuestion._id.toString(),
-        isCorrect ? "Correct" : "Incorrect"
-      ).catch((error) => {
-        console.error("Erreur lors de l'envoi du feedback:", error);
-      });
-
-      // Marquer la question comme traitée
-      setIsAnswered(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedback, currentQuestion]);
-
-  // Réinitialiser le drapeau lorsque la question change
-  useEffect(() => {
-    setIsAnswered(false);
-  }, [currentQuestion]);
-
-  if (!currentQuestion) {
-    return <Text>Chargement de la question...</Text>;
-  }
+  }, [feedback]);
 
   const onAnswerClick = (answer: string) => {
-    if (isAnswered) return;
+    if (selectedAnswer) return; // Empêche de répondre plusieurs fois
     setSelectedAnswer(answer);
     handleAnswer(answer);
   };
 
   const onNextClick = () => {
-    handleNextQuestion();
     setSelectedAnswer(null);
-    setIsAnswered(false);
-    setCorrectAnswer(null); // Réinitialise la bonne réponse
+    handleNextQuestion();
   };
+
+  if (!currentQuestion) {
+    return <Text>Chargement de la question...</Text>;
+  }
 
   return (
     <VStack spacing={4} align="stretch">
       <MCard text={currentQuestion.question} />
       <Text>
-        Temps de jeu : {Math.floor(gameTimer / 60)}:
-        {(gameTimer % 60).toString().padStart(2, "0")}
-      </Text>
-      <Text>
-        Temps pour cette question : {Math.ceil(questionTimer)} secondes
-      </Text>
-      <Text>
         Question {currentQuestionIndex + 1} sur {totalQuestions}
       </Text>
       <Stack width="100%" spacing={2}>
-        {currentQuestion.answers.map((answer, index) => (
-          <Button
-            key={index}
-            onClick={() => onAnswerClick(answer.text)}
-            colorScheme={
-              isAnswered
-                ? answer.isCorrect
-                  ? "green"
-                  : selectedAnswer === answer.text
-                  ? "red"
-                  : "gray"
-                : "blue"
+        {currentQuestion.answers.map((answer, index) => {
+          let colorScheme = "blue";
+          if (feedback && selectedAnswer) {
+            if (feedback.correctAnswer === answer.text) {
+              colorScheme = "green";
+            } else if (selectedAnswer === answer.text) {
+              colorScheme = "red";
+            } else {
+              colorScheme = "gray";
             }
-            disabled={isAnswered}
-            width="100%"
-          >
-            {answer.text}
-          </Button>
-        ))}
+          }
+          return (
+            <Button
+              key={index}
+              onClick={() => onAnswerClick(answer.text)}
+              colorScheme={colorScheme}
+              disabled={!!selectedAnswer}
+              width="100%"
+            >
+              {answer.text}
+            </Button>
+          );
+        })}
       </Stack>
-      {isAnswered && (
+      {feedback && feedback.showNextButton && (
         <Box width="100%" textAlign="center">
           <Text fontWeight="bold" mb={2}>
-            {feedback}
+            {feedback.correct ? "Bonne réponse !" : "Mauvaise réponse."}
           </Text>
           <Button colorScheme="blue" onClick={onNextClick} width="100%">
             Question Suivante
@@ -587,11 +601,10 @@ export default Quiz;
 ---------
 /// memory-app/src/components/RealTimeGame.tsx
 
-import React from "react";
-import { Box, Text, Button, VStack, HStack, Progress } from "@chakra-ui/react";
-import useRealTimeGame from "../hooks/useRealTimeGame";
+import React, { useState } from "react";
+import { VStack, Text, Button, HStack, Box } from "@chakra-ui/react";
 import useGameStore from "../store/gameStore";
-import { MCard } from "./GameMode/Card";
+import useRealTimeGame from "../hooks/useRealTimeGame";
 
 interface RealTimeGameProps {
   knowledgeSetId: string;
@@ -602,40 +615,39 @@ const RealTimeGame: React.FC<RealTimeGameProps> = ({
   knowledgeSetId,
   sessionId,
 }) => {
-  const { gameTimer, questionTimer, handleAnswer, handleNextQuestion } =
-    useRealTimeGame(knowledgeSetId, sessionId || undefined);
-  const { currentQuestion, feedback, showNextButton } = useGameStore();
+  const { currentQuestion, feedback } = useGameStore();
+  const { handleAnswer, handleNextQuestion } = useRealTimeGame(
+    knowledgeSetId,
+    sessionId || undefined
+  );
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+
+  const onAnswerClick = (answer: string) => {
+    if (selectedAnswer) return;
+    setSelectedAnswer(answer);
+    handleAnswer(answer);
+  };
 
   if (!currentQuestion) {
-    return <Text>Waiting for the game to start...</Text>;
+    return <Text>Chargement de la question...</Text>;
   }
 
   return (
-    <VStack spacing={4} align="stretch">
-      <Box>
-        <Text fontWeight="bold">Game Time Remaining:</Text>
-        <Text>
-          {Math.floor(gameTimer / 60)}:
-          {(gameTimer % 60).toString().padStart(2, "0")}
-        </Text>
-        <Progress value={(gameTimer / 300) * 100} />
-      </Box>
-
-      <MCard text={currentQuestion.question} />
-
-      <Box>
-        <Text fontWeight="bold">Time Remaining for this Question:</Text>
-        <Text>{Math.ceil(questionTimer)} seconds</Text>
-        <Progress value={(questionTimer / 10) * 100} colorScheme="green" />
-      </Box>
-
-      <HStack spacing={4} wrap="wrap" justify="center">
+    <VStack spacing={4}>
+      <Text fontSize="xl">{currentQuestion.question}</Text>
+      <HStack spacing={4}>
         {currentQuestion.answers.map((answer, index) => (
           <Button
             key={index}
-            onClick={() => handleAnswer(answer.text)}
-            colorScheme="blue"
-            isDisabled={questionTimer === 0 || showNextButton}
+            onClick={() => onAnswerClick(answer.text)}
+            colorScheme={
+              feedback && feedback.correctAnswer === answer.text
+                ? "green"
+                : selectedAnswer === answer.text
+                ? "red"
+                : "blue"
+            }
+            disabled={!!selectedAnswer}
           >
             {answer.text}
           </Button>
@@ -645,16 +657,21 @@ const RealTimeGame: React.FC<RealTimeGameProps> = ({
       {feedback && (
         <Box
           p={3}
-          bg={feedback.includes("Correct") ? "green.100" : "red.100"}
+          bg={feedback.correct ? "green.100" : "red.100"}
           borderRadius="md"
         >
-          <Text fontWeight="bold">{feedback}</Text>
+          <Text fontWeight="bold">
+            {feedback.correct ? "Bonne réponse !" : "Mauvaise réponse."}
+          </Text>
+          {!feedback.correct && feedback.correctAnswer && (
+            <Text>La bonne réponse était : {feedback.correctAnswer}</Text>
+          )}
         </Box>
       )}
 
-      {showNextButton && (
+      {feedback && feedback.showNextButton && (
         <Button onClick={handleNextQuestion} colorScheme="teal">
-          Next Question
+          Question Suivante
         </Button>
       )}
     </VStack>
@@ -951,6 +968,152 @@ export {};
 //  answer: string;
 //  isResolve: boolean;
 //}
+
+
+---------
+/// memory-app/src/components/XForm.tsx
+
+import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Input,
+  FormControl,
+  FormLabel,
+  VStack,
+  HStack,
+  Select,
+  Checkbox,
+} from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+import { IProperty, IX } from "../Types"; // Import des types appropriés
+import { useNavigate } from "react-router-dom";
+
+const propertyTypes = [
+  "Date",
+  "Texte",
+  "Nombre",
+  "ID",
+  "Couleur",
+  "Audio",
+  "Image",
+  "Zone de texte",
+  "Minuteur",
+  "Page",
+  "Fonction JavaScript",
+];
+
+interface XFormProps {
+  existingX?: IX;
+}
+
+export const XForm: React.FC<XFormProps> = ({ existingX }) => {
+  const [properties, setProperties] = useState<IProperty[]>(
+    existingX?.properties || []
+  );
+  const { createX, updateX } = useApi();
+  const navigate = useNavigate();
+
+  const addProperty = () => {
+    setProperties([
+      ...properties,
+      { name: "", value: "", type: "Texte", isList: false, required: false },
+    ]);
+  };
+
+  const handlePropertyChange = (
+    index: number,
+    field: keyof IProperty,
+    value: any
+  ) => {
+    const updatedProperties = [...properties];
+    updatedProperties[index][field] = value;
+    setProperties(updatedProperties);
+  };
+
+  const handleSubmit = async () => {
+    const xData = { properties };
+    try {
+      if (existingX) {
+        await updateX(existingX._id, xData);
+      } else {
+        await createX(xData);
+      }
+      // Rediriger vers la liste après la création/mise à jour
+      navigate("/x");
+    } catch (error) {
+      console.error("Erreur lors de la soumission du formulaire X:", error);
+    }
+  };
+
+  return (
+    <Box>
+      <VStack spacing={4}>
+        {properties.map((prop: IProperty, index: number) => (
+          <Box key={index} borderWidth="1px" borderRadius="md" p={4} w="100%">
+            <FormControl>
+              <FormLabel>Nom de la propriété</FormLabel>
+              <Input
+                value={prop.name}
+                onChange={(e) =>
+                  handlePropertyChange(index, "name", e.target.value)
+                }
+              />
+            </FormControl>
+            <FormControl mt={2}>
+              <FormLabel>Type de la propriété</FormLabel>
+              <Select
+                value={prop.type}
+                onChange={(e) =>
+                  handlePropertyChange(index, "type", e.target.value)
+                }
+              >
+                {propertyTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl mt={2}>
+              <FormLabel>Valeur</FormLabel>
+              <Input
+                value={prop.value}
+                onChange={(e) =>
+                  handlePropertyChange(index, "value", e.target.value)
+                }
+              />
+            </FormControl>
+            <HStack mt={2}>
+              <Checkbox
+                isChecked={prop.isList || false}
+                onChange={(e) =>
+                  handlePropertyChange(index, "isList", e.target.checked)
+                }
+              >
+                Est une liste
+              </Checkbox>
+              <Checkbox
+                isChecked={prop.required || false}
+                onChange={(e) =>
+                  handlePropertyChange(index, "required", e.target.checked)
+                }
+              >
+                Requise
+              </Checkbox>
+            </HStack>
+          </Box>
+        ))}
+        <Button onClick={addProperty}>Ajouter une propriété</Button>
+        <Button colorScheme="blue" onClick={handleSubmit}>
+          {existingX ? "Mettre à jour" : "Créer"}
+        </Button>
+      </VStack>
+    </Box>
+  );
+};
+
+export default XForm;
 
 
 ---------
@@ -1414,7 +1577,7 @@ api.interceptors.response.use(
   (error) => {
     console.error("Error in response:", error.response?.data || error.message);
 
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 403) {
       // Déconnexion de l'utilisateur
       useUserStore.getState().clearToken();
       localStorage.removeItem("access_token");
@@ -1435,6 +1598,7 @@ const PATH = {
   activeSessions: "/api/game/sessions/active",
   knowledgeSets: "/api/knowledge-set",
   gamePerformance: "/api/game/performance", // Ajouté pour récupérer les performances
+  x: "/api/x",
 };
 
 // Fonction pour définir le token dans le store et le localStorage
@@ -1571,6 +1735,46 @@ const getGamePerformance = async (gameStateId: string) => {
   }
 };
 
+const getAllX = async () => {
+  try {
+    const response = await api.get(PATH.x);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to get all X:", error);
+    throw error;
+  }
+};
+
+const createX = async (xData: any) => {
+  try {
+    const response = await api.post(PATH.x, xData);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to create X:", error);
+    throw error;
+  }
+};
+
+const updateX = async (id: string, updates: any) => {
+  try {
+    const response = await api.put(`${PATH.x}/${id}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to update X:", error);
+    throw error;
+  }
+};
+
+const getXById = async (id: string) => {
+  try {
+    const response = await api.get(`${PATH.x}/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to get X by id:", error);
+    throw error;
+  }
+};
+
 // Exportez vos fonctions via le hook useApi
 export const useApi = () => {
   return {
@@ -1581,6 +1785,10 @@ export const useApi = () => {
     login,
     getActiveSessions,
     getUserKnowledgeSets,
+    createX,
+    getAllX,
+    getXById,
+    updateX,
     sendFeedback,
     getGamePerformance, // Exporté pour utiliser dans SummaryPage
   };
@@ -1626,12 +1834,10 @@ export const useQuery = (): { Q: string } => {
 ---------
 /// memory-app/src/hooks/useRealTimeGame.ts
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import useGameStore from "../store/gameStore";
 import useUserStore from "../store";
-import useProgressStore from "../store/progressStore";
-import { useApi } from "./useApi";
 
 const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
   const {
@@ -1641,9 +1847,8 @@ const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
     setCurrentQuestionIndex,
     setGameStateId,
   } = useGameStore();
-  const { setTotalQuestions: setProgressTotalQuestions } = useProgressStore();
-  const { getGamePerformance } = useApi();
   const userStore = useUserStore();
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!userStore.token) return;
@@ -1653,6 +1858,8 @@ const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
         token: userStore.token,
       },
     });
+
+    socketRef.current = socket;
 
     socket.on("connect", () => {
       console.log("Connected to game socket");
@@ -1669,24 +1876,23 @@ const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
       setCurrentQuestion(data);
       setCurrentQuestionIndex(data.currentQuestionIndex);
       setTotalQuestions(data.totalQuestions);
-      setProgressTotalQuestions(data.totalQuestions);
-      setGameStateId(data.gameStateId || null); // Assurez-vous que gameStateId est transmis
+      setGameStateId(data.gameStateId || null);
+      setFeedback(null); // Réinitialiser le feedback pour la nouvelle question
     });
 
     socket.on("feedback", (data) => {
       console.log("Received feedback:", data);
-      setFeedback(data);
+      setFeedback(data); // data doit correspondre au type FeedbackType
     });
 
     socket.on("gameOver", (data) => {
       console.log("Game over:", data);
-      setFeedback(`Partie terminée ! Score: ${data.score}`);
-      // Vous pouvez éventuellement stocker le gameStateId ici si nécessaire
+      setFeedback({ correct: false, showNextButton: false }); // Vous pouvez ajuster selon vos besoins
     });
 
     socket.on("error", (errorMessage: string) => {
       console.error("Socket error:", errorMessage);
-      setFeedback(`Erreur: ${errorMessage}`);
+      setFeedback({ correct: false, showNextButton: false });
     });
 
     return () => {
@@ -1701,21 +1907,26 @@ const useRealTimeGame = (knowledgeSetId: string, sessionId?: string) => {
     setTotalQuestions,
     setCurrentQuestionIndex,
     setGameStateId,
-    setProgressTotalQuestions,
   ]);
 
-  const { gameStateId } = useGameStore();
+  const handleAnswer = (answer: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit("submitAnswer", { answer });
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (socketRef.current) {
+      socketRef.current.emit("nextQuestion");
+    }
+  };
 
   return {
-    gameTimer: 0, // Vous devriez implémenter le timer si nécessaire
-    questionTimer: 0, // Vous devriez implémenter le timer si nécessaire
-    handleAnswer: (answer: string) => {
-      // Implémenter la logique d'envoi de réponse via socket
-    },
-    handleNextQuestion: () => {
-      // Implémenter la logique de demande de la prochaine question via socket
-    },
-    gameStateId,
+    gameTimer: 0,
+    questionTimer: 0,
+    handleAnswer,
+    handleNextQuestion,
+    gameStateId: useGameStore.getState().gameStateId,
   };
 };
 
@@ -1886,7 +2097,15 @@ export const GameModes = () => {
         <RealTimeGame knowledgeSetId={id} sessionId={sessionId} />
       )}
 
-      <Text mt={4}>{feedback}</Text>
+      {feedback && (
+        <Text mt={4}>
+          {feedback.correct
+            ? "Bonne réponse !"
+            : feedback.timeUp
+            ? "Temps écoulé !"
+            : "Mauvaise réponse."}
+        </Text>
+      )}
 
       <Flex justify="space-between">
         <Text>
@@ -2354,6 +2573,98 @@ export default SummaryPage;
 
 
 ---------
+/// memory-app/src/pages/XDetailPage.tsx
+
+import React, { useEffect, useState } from "react";
+import { Box, Text, VStack } from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+import { useParams } from "react-router-dom";
+
+export const XDetailPage = () => {
+  const { id } = useParams<{ id: string }>();
+  const [xData, setXData] = useState<any>(null);
+  const { getXById } = useApi();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = await getXById(id!);
+      setXData(data.data);
+    };
+    fetchData();
+  }, [id, getXById]);
+
+  if (!xData) {
+    return <Text>Chargement...</Text>;
+  }
+
+  return (
+    <Box>
+      <Text fontSize="2xl">Détails de l'objet X</Text>
+      <VStack spacing={4} mt={4}>
+        {xData.properties.map((prop: any, index: number) => (
+          <Box key={index} borderWidth="1px" borderRadius="md" p={4} w="100%">
+            <Text>Nom: {prop.name}</Text>
+            <Text>Type: {prop.type}</Text>
+            <Text>Valeur: {prop.value}</Text>
+            <Text>Est une liste: {prop.isList ? "Oui" : "Non"}</Text>
+            <Text>Requise: {prop.required ? "Oui" : "Non"}</Text>
+          </Box>
+        ))}
+      </VStack>
+    </Box>
+  );
+};
+
+
+---------
+/// memory-app/src/pages/XListPage.tsx
+
+import React, { useEffect, useState } from "react";
+import { Box, Text, Button, VStack } from "@chakra-ui/react";
+import { useApi } from "../hooks/useApi";
+import { useNavigate } from "react-router-dom";
+import { IX } from "../Types"; // Import du type IX
+
+export const XListPage: React.FC = () => {
+  const [xList, setXList] = useState<IX[]>([]);
+  const { getAllX } = useApi();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchXList = async () => {
+      try {
+        const response = await getAllX();
+        setXList(response.data);
+      } catch (error) {
+        console.error(
+          "Erreur lors de la récupération de la liste des X:",
+          error
+        );
+      }
+    };
+    fetchXList();
+  }, [getAllX]);
+
+  const handleView = (id: string) => {
+    navigate(`/x/${id}`);
+  };
+
+  return (
+    <VStack spacing={4}>
+      {xList.map((x: IX) => (
+        <Box key={x._id} borderWidth="1px" borderRadius="md" p={4} w="100%">
+          <Text>Objet X: {x._id}</Text>
+          <Button onClick={() => handleView(x._id)}>Voir</Button>
+        </Box>
+      ))}
+    </VStack>
+  );
+};
+
+export default XListPage;
+
+
+---------
 /// memory-app/src/react-app-env.d.ts
 
 /// <reference types="react-scripts" />
@@ -2546,23 +2857,39 @@ import "@testing-library/jest-dom"
 import { create } from "zustand";
 import { MemoryCardType } from "../Types";
 
+// Définir le type FeedbackType
+interface FeedbackType {
+  correct?: boolean;
+  correctAnswer?: string;
+  showNextButton?: boolean;
+  timeUp?: boolean;
+}
+
+const shuffleArray = (array: any[]) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
 interface GameState {
   currentQuestion: MemoryCardType | null;
   questions: MemoryCardType[];
   currentQuestionIndex: number;
   gameTimer: number;
   questionTimer: number;
-  feedback: string;
+  feedback: FeedbackType | null; // Mettre à jour le type ici
   showNextButton: boolean;
-  correctAnswer: string | null; // Ajouté
-  totalQuestions: number; // Ajouté
-  gameStateId: string | null; // Ajouté
+  correctAnswer: string | null;
+  totalQuestions: number;
+  gameStateId: string | null;
   setCurrentQuestion: (question: MemoryCardType) => void;
-  setFeedback: (feedback: string) => void;
-  setCorrectAnswer: (answer: string | null) => void; // Ajouté
-  setCurrentQuestionIndex: (index: number) => void; // Ajouté
-  setTotalQuestions: (total: number) => void; // Ajouté
-  setGameStateId: (id: string | null) => void; // Ajouté
+  setFeedback: (feedback: FeedbackType | null) => void; // Mettre à jour le type ici
+  setCorrectAnswer: (answer: string | null) => void;
+  setCurrentQuestionIndex: (index: number) => void;
+  setTotalQuestions: (total: number) => void;
+  setGameStateId: (id: string | null) => void;
   setGameTimer: (timer: number | ((prev: number) => number)) => void;
   setQuestionTimer: (timer: number | ((prev: number) => number)) => void;
   setShowNextButton: (show: boolean) => void;
@@ -2574,13 +2901,13 @@ const useGameStore = create<GameState>((set) => ({
   currentQuestion: null,
   questions: [],
   currentQuestionIndex: 0,
-  gameTimer: 300, // Temps total du jeu en secondes
-  questionTimer: 10, // Temps par question en secondes
-  feedback: "",
+  gameTimer: 300,
+  questionTimer: 10,
+  feedback: null, // Initialiser à null
   showNextButton: false,
-  correctAnswer: null, // Initialisé
-  totalQuestions: 0, // Initialisé
-  gameStateId: null, // Initialisé
+  correctAnswer: null,
+  totalQuestions: 0,
+  gameStateId: null,
   setCurrentQuestion: (question) => set({ currentQuestion: question }),
   setFeedback: (feedback) => set({ feedback }),
   setCorrectAnswer: (answer) => set({ correctAnswer: answer }),
@@ -2604,12 +2931,12 @@ const useGameStore = create<GameState>((set) => ({
         return {
           currentQuestionIndex: nextIndex,
           currentQuestion: state.questions[nextIndex],
-          questionTimer: 10, // Réinitialiser le timer de la question
+          questionTimer: 10,
           showNextButton: false,
-          correctAnswer: null, // Réinitialiser la bonne réponse
+          correctAnswer: null,
         };
       }
-      return state; // Aucun changement si c'est la dernière question
+      return state;
     }),
   setQuestions: (questions) =>
     set({
